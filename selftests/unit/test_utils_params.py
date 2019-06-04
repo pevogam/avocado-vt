@@ -162,6 +162,98 @@ class TestParams(unittest.TestCase):
         self.assertEqual(pruned["b"], self.params["b"])
         self.assertNotIn("_b", pruned.keys())
 
+    def testIsObjectSpecific(self):
+        self.assertTrue(utils_params.is_object_specific("genie_vm1", ["vm1", "vm2"]))
+        self.assertFalse(utils_params.is_object_specific("genie_vm1", ["nic1", "nic2"]))
+        self.assertTrue(utils_params.is_object_specific("god_vm2", ["vm1", "vm2"]))
+        self.assertFalse(utils_params.is_object_specific("god_vm2", ["nic1", "nic2"]))
+        self.assertFalse(utils_params.is_object_specific("genie", ["vm1", "vm2"]))
+        self.assertFalse(utils_params.is_object_specific("god", ["vm1", "vm2"]))
+        self.assertFalse(utils_params.is_object_specific("wizard", ["vm1", "vm2"]))
+        self.assertFalse(utils_params.is_object_specific("wizard", ["wizard"]))
+
+    def testObjectParams(self):
+        vm_params = utils_params.Params({"name_vm1": "josh", "name_vm2": "jean", "name": "jarjar", "surname": "jura"})
+        params = utils_params.object_params(vm_params, "vm1", ["vm1", "vm2"])
+        for key in params.keys():
+            self.assertFalse(utils_params.is_object_specific(key, ["vm1", "vm2"]))
+
+    def testObjectifyParams(self):
+        params = utils_params.Params({"name_vm1": "josh", "name_vm2": "jean", "name": "jarjar", "surname": "jura"})
+        vm_params = utils_params.objectify_params(params, "vm1", ["vm1", "vm2"])
+        # Parameters already specific to the object must be preserved
+        self.assertIn("name_vm1" in vm_params)
+        # Parameters already specific to the object must be preserved
+        self.assertEqual(vm_params["name_vm1"], params["name_vm1"])
+        # Parameters specific to a different object must be pruned
+        self.assertNotIn("name_vm2", vm_params)
+        # Parameters not specific to any object must be pruned if there is specific alternative
+        self.assertNotIn("name", vm_params)
+        # Parameters not specific to any object must become specific to the object
+        self.assertIn("surname_vm1", vm_params)
+        # Parameters not specific to any object must become specific to the object
+        self.assertNotIn("surname", vm_params)
+
+    def testMergeObjectParams(self):
+        params1 = utils_params.Params({"name_vm1": "josh", "name": "jarjar", "surname": "jura"})
+        params2 = utils_params.Params({"name_vm2": "jean", "name": "jaja", "surname": "jura"})
+        vm_params = utils_params.merge_object_params(["vm1", "vm2"], [params1, params2], "vms", "vm1")
+        # Main object specific parameters must be default
+        self.assertIn("name", vm_params)
+        # Main object specific parameters must be default
+        self.assertEqual(vm_params["name"], params1["name_vm1"])
+        # Secondary object specific parameters must be preserved
+        self.assertIn("name_vm2", vm_params)
+        # Secondary object specific parameters must be preserved
+        self.assertEqual(vm_params["name_vm2"], params2["name_vm2"])
+        # The parameters identical for all objects are reduced to default parameters
+        self.assertIn("surname", vm_params)
+        # The parameters identical for all objects are reduced to default parameters
+        self.assertEqual(vm_params["surname"], "jura")
+
+    def testMultiplyParamsPerObject(self):
+        os.environ['PREFIX'] = "ut"
+        params = utils_params.Params({"vm_unique_keys": "foo bar", "foo": "baz", "bar": "bazz", "other": "misc"})
+        vm_params = utils_params.multiply_params_per_object(params, ["vm1", "vm2"])
+        # Object specific parameters must exist for each object
+        self.assertIn("foo_vm1", vm_params)
+        # Multiplication also involves the value
+        self.assertTrue(vm_params["foo_vm1"].startswith("ut_vm1"), vm_params["foo_vm1"])
+        # Object specific parameters must exist for each object
+        self.assertIn("foo_vm2", vm_params)
+        # Multiplication also involves the value
+        self.assertTrue(vm_params["foo_vm2"].startswith("ut_vm2"), vm_params["foo_vm2"])
+        # Default parameter is preserved after multiplication
+        self.assertIn("foo", vm_params)
+        # Default parameter value is preserved after multiplication
+        self.assertFalse(vm_params["foo"].startswith("ut_vm1"), vm_params["foo"])
+        # Default parameter value is preserved after multiplication
+        self.assertFalse(vm_params["foo"].startswith("ut_vm2"), vm_params["foo"])
+        # Object specific parameters must exist for each object
+        self.assertIn("bar_vm1", vm_params)
+        # Multiplication also involves the value
+        self.assertTrue(vm_params["bar_vm1"].startswith("ut_vm1"), vm_params["bar_vm1"])
+        # Object specific parameters must exist for each object
+        self.assertIn("bar_vm2", vm_params)
+        # Multiplication also involves the value
+        self.assertTrue(vm_params["bar_vm2"].startswith("ut_vm2"), vm_params["bar_vm2"])
+        # Default parameter is preserved after multiplication
+        self.assertIn("bar", vm_params)
+        # Default parameter value is preserved after multiplication
+        self.assertFalse(vm_params["bar"].startswith("ut_vm1"), vm_params["bar"])
+        # Default parameter value is preserved after multiplication
+        self.assertFalse(vm_params["bar"].startswith("ut_vm2"), vm_params["bar"])
+        # Object general parameters must not be multiplied
+        self.assertNotIn("other_vm1", vm_params)
+        # Object general parameters must not be multiplied
+        self.assertNotIn("other_vm2", vm_params)
+        # Object general parameters must be preserved as is
+        self.assertIn("other", vm_params)
+        # Object general parameter value is preserved after multiplication
+        self.assertFalse(vm_params["other"].startswith("ut_vm1"), vm_params["other"])
+        # Object general parameter value is preserved after multiplication
+        self.assertFalse(vm_params["other"].startswith("ut_vm2"), vm_params["other"])
+
 
 if __name__ == "__main__":
     unittest.main()
