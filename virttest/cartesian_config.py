@@ -1977,6 +1977,10 @@ class Parser(object):
                 yield d
             node.content = old_content[:]
 
+        # no more recursive calls - restore parent generator
+        if parent:
+            self.parent_generator = True
+
     def mk_name(self, n1, n2):
         """Make name for test. Case: two dics were merged"""
         common_prefix = n1[:[x[0] == x[1] for x in list(zip(n1, n2))].index(0)]
