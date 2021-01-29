@@ -116,6 +116,9 @@ with all the avocado convenience features, such as HTML report,
 Xunit output, among others.
 
 %prep
+# TODO: a bug in the extension manages craws through dependencies and complains
+# despite this being just a build and not an install operation
+pip3 install aexpect
 %if 0%{?rel_build}
 %setup -q -n %{srcname}-%{version}
 %else
