@@ -21,9 +21,9 @@
 %endif
 
 %if 0%{?rhel}
-    %global with_python3 0
+    %global with_python2 1
 %else
-    %global with_python3 1
+    %global with_python2 0
 %endif
 
 # The Python dependencies are already tracked by the python2
@@ -49,12 +49,12 @@ Source0: https://github.com/avocado-framework/%{srcname}/archive/%{commit}.tar.g
 # old way of retrieving snapshot sources
 #Source0: https://github.com/avocado-framework/%{srcname}/archive/%{commit}/%{srcname}-%{version}-%{shortcommit}.tar.gz
 %endif
+%if %{with_python2}
 BuildRequires: python2-devel, python2-setuptools, python-six
 Requires: python-six
-%if %{with_python3}
+%endif
 BuildRequires: python3-devel, python3-setuptools, python3-six
 Requires: python3-six
-%endif
 BuildArch: noarch
 Requires: autotest-framework, xz, tcpdump, iproute, iputils, gcc, glibc-headers, nc, git
 Requires: attr
@@ -64,10 +64,10 @@ Requires: policycoreutils-python
 Requires: policycoreutils-python-utils
 %endif
 
+%if %{with_python2}
 Requires: python2-imaging
-%if %{with_python3}
-Requires: python3-imaging
 %endif
+Requires: python3-imaging
 %if 0%{?el6}
 Requires: gstreamer-python, gstreamer-plugins-good
 %else
@@ -79,6 +79,7 @@ Avocado Virt Test is a plugin that lets you execute virt-tests
 with all the avocado convenience features, such as HTML report,
 Xunit output, among others.
 
+%if %{with_python2}
 %package -n python2-%{name}
 Summary: %{summary}
 Requires: python2, python2-devel, python2-avocado >= 51.0, python2-aexpect
@@ -102,8 +103,8 @@ Provides: %{name} = %{version}-%{release}
 Avocado Virt Test is a plugin that lets you execute virt-tests
 with all the avocado convenience features, such as HTML report,
 Xunit output, among others.
+%endif
 
-%if %{with_python3}
 %package -n python3-%{name}
 Summary: %{summary}
 Requires: python3, python3-devel, python3-avocado >= 51.0, python3-aexpect
@@ -113,7 +114,6 @@ Requires: python3-netaddr, python3-netifaces, python3-simplejson
 Avocado Virt Test is a plugin that lets you execute virt-tests
 with all the avocado convenience features, such as HTML report,
 Xunit output, among others.
-%endif
 
 %prep
 %if 0%{?rel_build}
@@ -123,20 +123,21 @@ Xunit output, among others.
 %endif
 
 %build
+%if %{with_python2}
 %{__python2} setup.py build
-%if %{with_python3}
-%{__python3} setup.py build
 %endif
+%{__python3} setup.py build
 
 %install
 %{__mkdir} -p %{buildroot}%{_sysconfdir}/avocado/conf.d
+%if %{with_python2}
 %{__python2} setup.py install --root %{buildroot} --skip-build
 %{__mv} %{buildroot}%{python2_sitelib}/avocado_vt/conf.d/* %{buildroot}%{_sysconfdir}/avocado/conf.d
-%if %{with_python3}
+%endif
 %{__python3} setup.py install --root %{buildroot} --skip-build
 %{__mv} %{buildroot}%{python3_sitelib}/avocado_vt/conf.d/* %{buildroot}%{_sysconfdir}/avocado/conf.d
-%endif
 
+%if %{with_python2}
 %files -n python2-%{name}
 %defattr(-,root,root,-)
 %dir %{_sysconfdir}/avocado
@@ -149,8 +150,8 @@ Xunit output, among others.
 %{_datadir}/avocado-plugins-vt/backends/*
 %{_datadir}/avocado-plugins-vt/shared/*
 %{_datadir}/avocado-plugins-vt/test-providers.d/*
+%endif
 
-%if %{with_python3}
 %files -n python3-%{name}
 %defattr(-,root,root,-)
 %dir %{_sysconfdir}/avocado
@@ -163,7 +164,6 @@ Xunit output, among others.
 %{_datadir}/avocado-plugins-vt/backends/*
 %{_datadir}/avocado-plugins-vt/shared/*
 %{_datadir}/avocado-plugins-vt/test-providers.d/*
-%endif
 
 
 %changelog
