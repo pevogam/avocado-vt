@@ -662,14 +662,18 @@ class BaseVM(object):
             return True
 
         try:
-            need_restart = (self.make_create_command() !=
-                            self.make_create_command(name, params, basedir))
+            vm_before = self.make_create_command()
+            vm_after = self.make_create_command(name, params, basedir)
+            need_restart = vm_before != vm_after
         except Exception:
             LOG.error(traceback.format_exc())
             need_restart = True
         if need_restart:
-            LOG.debug(
-                "VM params in env don't match requested, restarting.")
+            LOG.debug("VM params in env don't match requested, restarting.")
+            if vm_before:
+                LOG.debug("VM command line (before):\n%s", vm_before[0].cmdline())
+            if vm_after:
+                LOG.debug("VM command line (after):\n%s", vm_after[0].cmdline())
             return True
         else:
             # Command-line encoded state doesn't include all params

@@ -465,18 +465,26 @@ class DevContainer(object):
 
     def __eq__(self, qdev2):
         """ Are the VM representation alike? """
+        logging.critical("compared at all")
         if len(qdev2) != len(self):
+            logging.critical("len %s != %s", len(qdev2), len(self))
             return False
         if qdev2.get_state() != self.get_state():
             if qdev2.allow_hotplugged_vm:
                 if qdev2.get_state() > 0 or self.get_state() > 0:
+                    logging.critical("get_hotplugged_state %s != %s",
+                                     qdev2.get_state(), self.get_state())
                     return False
             else:
+                logging.critical("get_state %s != %s",
+                                 qdev2.get_state(), self.get_state())
                 return False
         for dev in self:
             if dev not in qdev2:
                 # TODO: broken again
                 if not isinstance(dev, qdevices.CharDevice):
+                    logging.critical("%s (%s) not in %s", dev, type(dev),
+                                     [(str(d), type(d)) for d in qdev2.__devices])
                     return False
 
         # state, buses and devices are handled earlier
@@ -489,7 +497,10 @@ class DevContainer(object):
                        "temporary_image_snapshots", "mig_params"):
                 continue
             if key not in qdev2 or qdev2[key] != value:
+                logging.critical("key %s not in %s or %s != %s",
+                                 key, [str(d) for d in qdev2], qdev2[key], value)
                 return False
+        logging.critical("equality worked")
         return True
 
     def __ne__(self, qdev2):
