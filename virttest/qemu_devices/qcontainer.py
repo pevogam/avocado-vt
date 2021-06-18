@@ -475,7 +475,9 @@ class DevContainer(object):
                 return False
         for dev in self:
             if dev not in qdev2:
-                return False
+                # TODO: broken again
+                if not isinstance(dev, qdevices.CharDevice):
+                    return False
 
         # state, buses and devices are handled earlier
         qdev2 = qdev2.__dict__

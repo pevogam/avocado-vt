@@ -180,6 +180,7 @@ class QBaseDevice(object):
             return False
         check_attrs = ['cmdline_nd', 'hotplug_hmp_nd', 'hotplug_qmp_nd']
         try:
+            # TODO: all char devices are no longer matched here
             for check_attr in check_attrs:
                 try:
                     _ = getattr(self, check_attr)()

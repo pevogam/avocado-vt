@@ -1678,6 +1678,7 @@ class VM(virt_vm.BaseVM):
                                               'workaround_qemu_qmp_crash'),
                                           params.get('allow_hotplugged_vm'))
         StrDev = qdevices.QStringDevice
+        CharDev = qdevices.CharDevice
         QDevice = qdevices.QDevice
 
         # update capabilities by users willingness
