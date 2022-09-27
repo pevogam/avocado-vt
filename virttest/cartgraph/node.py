@@ -1258,6 +1258,13 @@ class TestNode(Runnable):
 
         if not is_leaf:
             session = self.started_worker.get_session()
+
+            @door.run_remotely
+            def check_remote_states(params, env):
+                from virttest.states import setup as ss
+                from virttest.utils_params import Params
+                print(ss.check_states(Params(params), env=None))
+
             control_path = os.path.join(
                 self.params["suite_path"], "controls", "pre_state.control"
             )
@@ -1268,6 +1275,7 @@ class TestNode(Runnable):
                 mod_control_path, "params", node_params
             )
             try:
+                #self.should_run = check_remote_states(session, node_params, env=None)
                 door.run_subcontrol(session, mod_control_path)
                 should_run = False
             except ShellCmdError as error:
