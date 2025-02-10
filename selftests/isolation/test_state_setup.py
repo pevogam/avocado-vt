@@ -304,7 +304,8 @@ class StatesBoundaryTest(Test):
         self.run_params["states_nets"] = "mock"
         self.run_params["states_images"] = "mock"
         self.run_params["states_vms"] = "mock"
-        self.run_params["check_mode"] = "rr"
+        self.run_params["show_state"] = ".+"
+        self.run_params["show_mode"] = "rr"
         self.run_params["nets_gateway"] = ""
         self.run_params["nets_host"] = ""
         self.run_params["pool_scope"] = "own"
@@ -396,7 +397,7 @@ class StatesBoundaryTest(Test):
         with self.driver.mock_show([], backend_type) as driver:
             states = ss.show_states(self.run_params, self.env)
             self.driver.assert_show(driver, [], backend_type)
-        self.assertEqual(len(states), 0)
+        self.assertEqual(states, ["root"])
 
         # assert nonempty list with available states
         with self.driver.mock_show(
@@ -406,11 +407,11 @@ class StatesBoundaryTest(Test):
             self.driver.assert_show(
                 driver, ["launch", "launch_2-0", "launch3.0"], backend_type
             )
-        self.assertEqual(len(states), 3)
+        self.assertEqual(len(states), 4)
         self.assertIn("launch", states)
         self.assertIn("launch_2-0", states)
         self.assertIn("launch3.0", states)
-        self.assertNotIn("root", states)
+        self.assertIn("root", states)
         self.assertNotIn("boot", states)
 
     def _test_get_state(self, backend):
@@ -475,7 +476,8 @@ class StatesBoundaryTest(Test):
         with self.driver.mock_show(["launch"], backend_type) as driver:
             states = ss.show_states(self.run_params, self.env)
             driver.listdir.assert_called_once_with("/some/swarm2/vm1-abc.def/image1")
-        self.assertEqual(len(states), 1)
+        # TODO: we cannot guarantee the order for pool backends and we don't attribute meaning to it
+        self.assertEqual(set(states), set(["launch", "root"]))
 
     def test_show_vm_qcow2(self):
         """Test that state listing with the QCOW2VT backend works correctly."""
@@ -493,7 +495,8 @@ class StatesBoundaryTest(Test):
         with self.driver.mock_show(["launch"], backend_type) as driver:
             states = ss.show_states(self.run_params, self.env)
             driver.listdir.assert_called_once_with("/some/swarm2/vm1-abc.def")
-        self.assertEqual(len(states), 1)
+        # TODO: we cannot guarantee the order for pool backends and we don't attribute meaning to it
+        self.assertEqual(set(states), set(["launch", "root"]))
 
     def test_show_image_qcow2_boot(self):
         """
@@ -504,12 +507,11 @@ class StatesBoundaryTest(Test):
         """
         backend = "qcow2"
         backend_type = self._prepare_driver_from_backend(backend)
-        self.run_params[f"check_state_{backend_type}s_vm1"] = "launch"
 
         # assert behavior on root and state availability
         with self.driver.mock_show(["launch"], backend_type, True) as driver:
             self.mock_vms["vm1"].is_alive.return_value = True
-            exists = ss.check_states(self.run_params, self.env)
+            states = ss.show_states(self.run_params, self.env)
             # TODO: define more action types to achieve backend independence here,
             # perhaps after we generalize run vm requirement to all backend roots
             # self.driver.assert_check(driver, "launch", backend_type, 2)
@@ -519,9 +521,9 @@ class StatesBoundaryTest(Test):
             self.mock_file_exists.assert_not_called()
             # assert actual state is not checked and not available
             driver.system_output.assert_not_called()
-        self.assertFalse(exists)
+        self.assertEqual(states, [])
 
-    def test_check_vm_qcow2_noimage(self):
+    def test_show_vm_qcow2_noimage(self):
         """
         Test that state checking with the QCOW2VT backend considers missing images.
 
@@ -530,11 +532,10 @@ class StatesBoundaryTest(Test):
         """
         backend = "qcow2vt"
         backend_type = self._prepare_driver_from_backend(backend)
-        self.run_params[f"check_state_{backend_type}s_vm1"] = "launch"
 
         with self.driver.mock_show(["launch"], backend_type, True) as driver:
             self.driver.exist_switch = False
-            exists = ss.check_states(self.run_params, self.env)
+            exists = ss.show_states(self.run_params, self.env)
             # TODO: define more action types to achieve backend independence here,
             # perhaps after we generalize run vm requirement to all backend roots
             # self.driver.assert_check(driver, "launch", backend_type, 2)
@@ -623,25 +624,23 @@ class StatesBoundaryTest(Test):
         """Test that root checking with the LVM backend works."""
         backend = "lvm"
         backend_type = self._prepare_driver_from_backend(backend)
-        self.run_params[f"check_state_{backend_type}s_vm1"] = "root"
 
         # assert root state is correctly detected
         with self.driver.mock_show([], backend_type, True) as driver:
-            exists = ss.check_states(self.run_params, self.env)
+            states = ss.show_states(self.run_params, self.env)
             driver.lv_check.assert_called_once_with("disk_vm1", "LogVol")
-        self.assertTrue(exists)
+        self.assertEqual(states, ["root"])
 
         # assert root state is correctly not detected
         with self.driver.mock_show([], backend_type, False) as driver:
-            exists = ss.check_states(self.run_params, self.env)
+            states = ss.show_states(self.run_params, self.env)
             driver.lv_check.assert_called_once_with("disk_vm1", "LogVol")
-        self.assertFalse(exists)
+        self.assertEqual(states, [])
 
     def test_check_root_image_qcow2(self):
         """Test that root checking with the QCOW2 backend works."""
         backend = "qcow2"
         backend_type = self._prepare_driver_from_backend(backend)
-        self.run_params[f"check_state_{backend_type}s_vm1"] = "root"
         # bonus: test for two images rather than one
         self.run_params["images_vm1"] = "image1 image2"
         self.run_params["image_name_image1_vm1"] = "vm1/image1"
@@ -649,43 +648,41 @@ class StatesBoundaryTest(Test):
 
         # assert root state is correctly detected
         with self.driver.mock_show([], backend_type, True) as driver:
-            exists = ss.check_states(self.run_params, self.env)
-        self.assertTrue(exists)
+            states = ss.show_states(self.run_params, self.env)
+        self.assertEqual(states, ["root", "root"])
 
         # assert root state is correctly not detected
         with self.driver.mock_show([], backend_type, False) as driver:
-            exists = ss.check_states(self.run_params, self.env)
-        self.assertFalse(exists)
+            states = ss.show_states(self.run_params, self.env)
+        self.assertEqual(states, [])
 
         # assert running vms result in not completely available root state
         with self.driver.mock_show([], backend_type, True) as driver:
             self.mock_vms["vm1"].is_alive.return_value = True
-            exists = ss.check_states(self.run_params, self.env)
-        self.assertFalse(exists)
+            states = ss.show_states(self.run_params, self.env)
+        self.assertEqual(states, [])
 
     def test_check_root_vm_qcow2(self):
         """Test that root checking with the QCOW2VT backend works."""
         backend = "qcow2vt"
         backend_type = self._prepare_driver_from_backend(backend)
-        self.run_params[f"check_state_{backend_type}s_vm1"] = "root"
 
         # assert root state is correctly detected
         with self.driver.mock_show([], backend_type, True) as driver:
-            exists = ss.check_states(self.run_params, self.env)
+            states = ss.show_states(self.run_params, self.env)
             self.mock_vms["vm1"].is_alive.assert_called_once_with()
-        self.assertTrue(exists)
+        self.assertEqual(states, ["root"])
 
         # assert root state is correctly not detected
         with self.driver.mock_show([], backend_type, False) as driver:
-            exists = ss.check_states(self.run_params, self.env)
+            states = ss.show_states(self.run_params, self.env)
             self.mock_vms["vm1"].is_alive.assert_called_once_with()
-        self.assertFalse(exists)
+        self.assertEqual(states, [])
 
     def test_check_root_vm_ramfile(self):
         """Test that root checking with the ramfile backend works."""
         backend = "ramfile"
         backend_type = self._prepare_driver_from_backend(backend)
-        self.run_params[f"check_state_{backend_type}s_vm1"] = "root"
         # bonus: test for two images rather than one
         self.run_params["images_vm1"] = "image1 image2"
         self.run_params["image_name_image1_vm1"] = "vm1/image1"
@@ -702,13 +699,13 @@ class StatesBoundaryTest(Test):
                     self.driver.exist_lambda = lambda filename: filename.endswith(
                         file_suffix
                     ) or filename.endswith("vm1-abc.def")
-                    exists = ss.check_states(self.run_params, self.env)
-                self.assertTrue(exists)
+                    states = ss.show_states(self.run_params, self.env)
+                self.assertEqual(states, ["root"])
 
         # assert root state is correctly not detected
         with self.driver.mock_show([], backend_type, False) as driver:
-            exists = ss.check_states(self.run_params, self.env)
-        self.assertFalse(exists)
+            states = ss.show_states(self.run_params, self.env)
+        self.assertEqual(states, [])
 
     def test_get_root(self):
         """Test that root getting with a state backend works."""
@@ -930,7 +927,7 @@ class StatesBoundaryTest(Test):
         """Test the special character support for the QCOW2 backends."""
         self.run_params["image_name"] = "vm1/image"
 
-        for do in ["check", "get", "set", "unset"]:
+        for do in ["show", "get", "set", "unset"]:
             for state_type in ["images", "vms"]:
                 with self.subTest(
                     f"Testing QCOW2 dash processing for {do} operation on {state_type}"
@@ -1321,15 +1318,13 @@ class StatesPoolTest(Test):
     def test_show_cache_leftover(self):
         """Test that cache states are shown if no pool sources."""
         self._set_minimal_pool_params()
-        self.run_params["check_state"] = "launch"
+        self.run_params["show_state"] = "launch"
         self.run_params["show_location"] = ":/path/1"
         self._create_mock_sourced_backend(source_type="state")
 
         self.backend._show.return_value = ["launch", "launch2"]
         self.backend.transport.show.return_value = ["launch", "launch2"]
-        exists = self.run_params["check_state"] in self.backend.show(
-            self.run_params, self.env
-        )
+        exists = len(self.backend.show(self.run_params, self.env)) > 0
         self.backend._show.assert_called_once()
         self.backend.transport.show.assert_called_once()
         self.assertTrue(exists)
@@ -1337,15 +1332,13 @@ class StatesPoolTest(Test):
     def test_show_pool_none(self):
         """Test that no states are shown if both counterparts do not exist."""
         self._set_minimal_pool_params()
-        self.run_params["check_state"] = "launch"
+        self.run_params["show_state"] = "launch"
         self.run_params["show_location"] = ":/path/1 :/path/1"
         self._create_mock_sourced_backend(source_type="state")
 
         self.backend._show.return_value = []
         self.backend.transport.show.return_value = []
-        exists = self.run_params["check_state"] in self.backend.show(
-            self.run_params, self.env
-        )
+        exists = len(self.backend.show(self.run_params, self.env)) > 0
         self.backend._show.assert_called_once()
         self.backend.transport.show.assert_called_once()
         self.assertFalse(exists)
@@ -1613,7 +1606,7 @@ class StatesPoolTest(Test):
     def test_list_chain_image(self):
         """Test that a state and its complete backing chain will be listed."""
         self._set_minimal_pool_params()
-        self.run_params["check_state"] = "launch"
+        self.run_params["show_state"] = "launch"
         self.run_params["show_location"] = "container.host:/dir/subdir"
         self.run_params["object_type"] = "nets/vms/images"
 
@@ -1621,9 +1614,7 @@ class StatesPoolTest(Test):
         self.deps = ["launch", "prelaunch", ""]
 
         self.backend.ops.list_paths.return_value = ["launch.qcow2", "prelaunch.qcow2"]
-        exists = self.run_params["check_state"] in self.backend.show(
-            self.run_params, self.env
-        )
+        exists = len(self.backend.show(self.run_params, self.env)) > 0
         expected_checks = [
             mock.call("container.host:/dir/subdir/vm1-abc.def/image1", mock.ANY)
         ]
@@ -1635,7 +1626,7 @@ class StatesPoolTest(Test):
     def test_list_chain_vm(self):
         """Test that a state and its complete backing chain will be listed."""
         self._set_minimal_pool_params()
-        self.run_params["check_state"] = "launch"
+        self.run_params["show_state"] = "launch"
         self.run_params["show_location"] = "container.host:/dir/subdir"
         self.run_params["object_type"] = "nets/vms"
 
@@ -1643,9 +1634,7 @@ class StatesPoolTest(Test):
         self.deps = ["launch", "prelaunch", ""]
 
         self.backend.ops.list_paths.return_value = ["launch.state", "prelaunch.state"]
-        exists = self.run_params["check_state"] in self.backend.show(
-            self.run_params, self.env
-        )
+        exists = len(self.backend.show(self.run_params, self.env)) > 0
         expected_checks = [
             mock.call("container.host:/dir/subdir/vm1-abc.def", mock.ANY)
         ]
@@ -2092,7 +2081,6 @@ class StatesSetupTest(Test):
         self.run_params["states_nets"] = "mock"
         self.run_params["states_images"] = "mock"
         self.run_params["states_vms"] = "mock"
-        self.run_params["check_mode"] = "rr"
 
     def _get_mock_vm(self, vm_name):
         return self.mock_vms[vm_name]
@@ -2105,12 +2093,12 @@ class StatesSetupTest(Test):
 
     def test_check_root(self):
         """Test that state checking with a state backend can get roots."""
-        self._set_up_generic_params("check", "state", "objects", "object1")
+        self._set_up_generic_params("show", "state", "objects", "object1")
 
         # assert root state is not detected then created to check the actual state
         self.backend.check_root.return_value = True
         self.backend.show.return_value = []
-        exists = ss.check_states(self.run_params, self.env)
+        exists = ss.show_states(self.run_params, self.env)
         # assert root state is checked as a prerequisite
         self.backend.check_root.assert_called_once()
         # assert root state is always made available (provision for state checks)
@@ -2122,14 +2110,14 @@ class StatesSetupTest(Test):
 
     def test_check_forced_root(self):
         """Test that state checking with a state backend can set roots."""
-        self._set_up_generic_params("check", "state", "objects", "object1")
+        self._set_up_generic_params("show", "state", "objects", "object1")
         # TODO: should we check other policies or keep root-related behavior at all?
-        self.run_params["check_mode"] = "ff"
+        self.run_params["show_mode"] = "ff"
 
         # assert root state is not detected then created to check the actual state
         self.backend.check_root.return_value = False
         self.backend.show.return_value = []
-        exists = ss.check_states(self.run_params, self.env)
+        exists = ss.show_states(self.run_params, self.env)
         # assert root state is checked as a prerequisite
         self.backend.check_root.assert_called_once()
         # assert root state is provided from the check
@@ -2139,20 +2127,19 @@ class StatesSetupTest(Test):
         self.backend.show.assert_called_once()
         self.assertFalse(exists)
 
-    @mock.patch("virttest.states.setup.check_states")
+    @mock.patch("virttest.states.setup.show_states")
     def test_get(self, mock_show):
         """Test that state getting works with default policies."""
         self._set_up_generic_params("get", "state", "objects", "object1")
 
         # assert state retrieval is performed if state is available
         mock_show.reset()
-        mock_show.return_value = True
+        mock_show.return_value = ["state"]
         self.backend.reset_mock()
         ss.get_states(self.run_params, self.env)
         mock_show.assert_called_once()
         call_params = [call.args[0] for call in mock_show.call_args_list]
         self.assertEqual(len(call_params), 1)
-        self.assertEqual(call_params[0]["check_state"], "state")
         self.assertEqual(call_params[0]["show_location"], "/loc")
         self.assertEqual(call_params[0]["objects"], "object1")
         self.assertEqual(call_params[0]["object_name"], "object1")
@@ -2161,7 +2148,7 @@ class StatesSetupTest(Test):
 
         # assert state retrieval is aborted if state is not available
         mock_show.reset()
-        mock_show.return_value = False
+        mock_show.return_value = []
         self.backend.reset_mock()
         with self.assertRaises(exceptions.TestAbortError):
             ss.get_states(self.run_params, self.env)
@@ -2175,7 +2162,7 @@ class StatesSetupTest(Test):
         # assert state retrieval is aborted if state is available
         self.backend.reset_mock()
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=True)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=["state"])
         ):
             with self.assertRaises(exceptions.TestAbortError):
                 ss.get_states(self.run_params, self.env)
@@ -2184,7 +2171,7 @@ class StatesSetupTest(Test):
         # assert state retrieval is aborted if state is not available
         self.backend.reset_mock()
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=False)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=[])
         ):
             with self.assertRaises(exceptions.TestAbortError):
                 ss.get_states(self.run_params, self.env)
@@ -2198,7 +2185,7 @@ class StatesSetupTest(Test):
         # assert state retrieval is reused if available
         self.backend.reset_mock()
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=True)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=["state"])
         ):
             ss.get_states(self.run_params, self.env)
             self.backend.get.assert_called_once()
@@ -2211,7 +2198,7 @@ class StatesSetupTest(Test):
         # assert state retrieval is ignored if state is available
         self.backend.reset_mock()
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=True)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=["state"])
         ):
             ss.get_states(self.run_params, self.env)
             self.backend.get.assert_not_called()
@@ -2219,7 +2206,7 @@ class StatesSetupTest(Test):
         # assert state retrieval is ignored if state is not available
         self.backend.reset_mock()
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=False)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=[])
         ):
             ss.get_states(self.run_params, self.env)
             self.backend.get.assert_not_called()
@@ -2232,7 +2219,7 @@ class StatesSetupTest(Test):
         # assert invalid policy x if state is available
         self.backend.reset_mock()
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=True)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=["state"])
         ):
             with self.assertRaises(exceptions.TestError):
                 ss.get_states(self.run_params, self.env)
@@ -2241,26 +2228,25 @@ class StatesSetupTest(Test):
         # assert invalid policy x if state is not available
         self.backend.reset_mock()
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=False)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=[])
         ):
             with self.assertRaises(exceptions.TestError):
                 ss.get_states(self.run_params, self.env)
             self.backend.get.assert_not_called()
 
-    @mock.patch("virttest.states.setup.check_states")
+    @mock.patch("virttest.states.setup.show_states")
     def test_set(self, mock_show):
         """Test that state setting works with default policies."""
         self._set_up_generic_params("set", "state", "objects", "object1")
 
         # assert state saving is forced if state is available
         mock_show.reset()
-        mock_show.return_value = True
+        mock_show.return_value = ["state"]
         self.backend.reset_mock()
         ss.set_states(self.run_params, self.env)
         mock_show.assert_called_once()
         call_params = [call.args[0] for call in mock_show.call_args_list]
         self.assertEqual(len(call_params), 1)
-        self.assertEqual(call_params[0]["check_state"], "state")
         self.assertEqual(call_params[0]["show_location"], "/loc")
         self.assertEqual(call_params[0]["objects"], "object1")
         self.assertEqual(call_params[0]["object_name"], "object1")
@@ -2270,7 +2256,7 @@ class StatesSetupTest(Test):
 
         # assert state saving is forced if state is not available
         mock_show.reset()
-        mock_show.return_value = False
+        mock_show.return_value = []
         self.backend.reset_mock()
         ss.set_states(self.run_params, self.env)
         self.backend.unset.assert_not_called()
@@ -2278,7 +2264,7 @@ class StatesSetupTest(Test):
 
         # assert state saving cannot be forced if state root is not available
         mock_show.reset()
-        mock_show.return_value = False
+        mock_show.return_value = []
         self.backend.reset_mock()
         self.backend.check_root.return_value = False
         with self.assertRaises(exceptions.TestError):
@@ -2293,7 +2279,7 @@ class StatesSetupTest(Test):
         # assert state saving is aborted if state is available
         self.backend.reset_mock()
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=True)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=["state"])
         ):
             with self.assertRaises(exceptions.TestAbortError):
                 ss.set_states(self.run_params, self.env)
@@ -2302,7 +2288,7 @@ class StatesSetupTest(Test):
         # assert state saving is aborted if state is not available
         self.backend.reset_mock()
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=False)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=[])
         ):
             with self.assertRaises(exceptions.TestAbortError):
                 ss.set_states(self.run_params, self.env)
@@ -2316,7 +2302,7 @@ class StatesSetupTest(Test):
         # assert state saving is skipped if reusable state is available
         self.backend.reset_mock()
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=True)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=["state"])
         ):
             ss.set_states(self.run_params, self.env)
             self.backend.set.assert_not_called()
@@ -2329,7 +2315,7 @@ class StatesSetupTest(Test):
         # assert state saving is forced if state is available
         self.backend.reset_mock()
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=True)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=["state"])
         ):
             ss.set_states(self.run_params, self.env)
             self.backend.unset.assert_called_once()
@@ -2338,7 +2324,7 @@ class StatesSetupTest(Test):
         # assert state saving is forced if state is not available
         self.backend.reset_mock()
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=False)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=[])
         ):
             ss.set_states(self.run_params, self.env)
             self.backend.unset.assert_not_called()
@@ -2348,7 +2334,7 @@ class StatesSetupTest(Test):
         self.backend.reset_mock()
         self.backend.check_root.return_value = False
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=False)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=[])
         ):
             with self.assertRaises(exceptions.TestError):
                 ss.set_states(self.run_params, self.env)
@@ -2362,7 +2348,7 @@ class StatesSetupTest(Test):
         # assert invalid policy x if state is available
         self.backend.reset_mock()
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=True)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=["state"])
         ):
             with self.assertRaises(exceptions.TestError):
                 ss.set_states(self.run_params, self.env)
@@ -2371,26 +2357,25 @@ class StatesSetupTest(Test):
         # assert invalid policy x if state is not available
         self.backend.reset_mock()
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=False)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=[])
         ):
             with self.assertRaises(exceptions.TestError):
                 ss.set_states(self.run_params, self.env)
             self.backend.set.assert_not_called()
 
-    @mock.patch("virttest.states.setup.check_states")
+    @mock.patch("virttest.states.setup.show_states")
     def test_unset(self, mock_show):
         """Test that state unsetting works with default policies."""
         self._set_up_generic_params("unset", "state", "objects", "object1")
 
         # assert state removal is forced if state is available
         mock_show.reset()
-        mock_show.return_value = True
+        mock_show.return_value = ["state"]
         self.backend.reset_mock()
         ss.unset_states(self.run_params, self.env)
         mock_show.assert_called_once()
         call_params = [call.args[0] for call in mock_show.call_args_list]
         self.assertEqual(len(call_params), 1)
-        self.assertEqual(call_params[0]["check_state"], "state")
         self.assertEqual(call_params[0]["show_location"], "/loc")
         self.assertEqual(call_params[0]["objects"], "object1")
         self.assertEqual(call_params[0]["object_name"], "object1")
@@ -2399,7 +2384,7 @@ class StatesSetupTest(Test):
 
         # assert state removal is ignored if state is not available
         mock_show.reset()
-        mock_show.return_value = False
+        mock_show.return_value = []
         self.backend.reset_mock()
         ss.unset_states(self.run_params, self.env)
         self.backend.unset.assert_not_called()
@@ -2412,14 +2397,14 @@ class StatesSetupTest(Test):
         # assert state removal is skipped if reusable state is available
         self.backend.reset_mock()
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=True)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=["state"])
         ):
             ss.unset_states(self.run_params, self.env)
             self.backend.unset.assert_not_called()
 
         # assert state removal is aborted if state is not available
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=False)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=[])
         ):
             with self.assertRaises(exceptions.TestAbortError):
                 ss.unset_states(self.run_params, self.env)
@@ -2433,7 +2418,7 @@ class StatesSetupTest(Test):
         # assert state removal is forced if state is available
         self.backend.reset_mock()
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=True)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=["state"])
         ):
             ss.unset_states(self.run_params, self.env)
             self.backend.unset.assert_called_once()
@@ -2441,7 +2426,7 @@ class StatesSetupTest(Test):
         # assert state removal is ignored if state is not available
         self.backend.reset_mock()
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=False)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=[])
         ):
             ss.unset_states(self.run_params, self.env)
             self.backend.unset.assert_not_called()
@@ -2454,7 +2439,7 @@ class StatesSetupTest(Test):
         # assert invalid policy x if state is available
         self.backend.reset_mock()
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=True)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=["state"])
         ):
             with self.assertRaises(exceptions.TestError):
                 ss.unset_states(self.run_params, self.env)
@@ -2463,7 +2448,7 @@ class StatesSetupTest(Test):
         # assert invalid policy x if state is not available
         self.backend.reset_mock()
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=False)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=[])
         ):
             with self.assertRaises(exceptions.TestError):
                 ss.unset_states(self.run_params, self.env)
@@ -2476,7 +2461,7 @@ class StatesSetupTest(Test):
 
         self.backend.reset_mock()
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=False)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=[])
         ):
             ss.push_states(self.run_params, self.env)
             self.backend.unset.assert_not_called()
@@ -2486,7 +2471,7 @@ class StatesSetupTest(Test):
         self.backend.reset_mock()
         self._set_up_generic_params("push", "root", "objects", "object1")
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=False)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=[])
         ):
             ss.push_states(self.run_params, self.env)
             self.backend.unset.assert_not_called()
@@ -2494,7 +2479,7 @@ class StatesSetupTest(Test):
         self.backend.reset_mock()
         self._set_up_generic_params("push", "boot", "objects", "object1")
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=False)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=[])
         ):
             ss.push_states(self.run_params, self.env)
             self.backend.unset.assert_not_called()
@@ -2505,7 +2490,7 @@ class StatesSetupTest(Test):
         self._set_up_generic_params("pop", "state", "objects", "object1")
 
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=True)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=["state"])
         ):
             ss.pop_states(self.run_params, self.env)
             self.backend.get.assert_called_once()
@@ -2515,7 +2500,7 @@ class StatesSetupTest(Test):
         self.backend.reset_mock()
         self._set_up_generic_params("pop", "root", "objects", "object1")
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=False)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=[])
         ):
             ss.pop_states(self.run_params, self.env)
             self.backend.get.assert_not_called()
@@ -2523,56 +2508,47 @@ class StatesSetupTest(Test):
         self.backend.reset_mock()
         self._set_up_generic_params("pop", "root", "objects", "object1")
         with mock.patch(
-            "virttest.states.setup.check_states", mock.MagicMock(return_value=False)
+            "virttest.states.setup.show_states", mock.MagicMock(return_value=[])
         ):
             ss.pop_states(self.run_params, self.env)
             self.backend.get.assert_not_called()
             self.backend.unset.assert_not_called()
 
-    def test_check_multiobj(self):
+    def test_show_multiobj(self):
         """Test that checking various states of multiple vms and their images works."""
         self._set_up_multiobj_params()
         self.run_params["vms"] = "vm1 vm2"
         self.run_params["images_vm1"] = "image1 image2"
         self.run_params["images_vm2"] = "image21"
-        self.run_params["check_state_images"] = "launch"
-        self.run_params["check_state_images_image2_vm1"] = "launch2"
-        self.run_params["check_state_images_vm2"] = "launcher"
+        self.run_params["show_state"] = ".+"
         self.run_params["skip_types"] = "nets"
         self._create_mock_vms()
 
         self.backend.reset_mock()
-        self.backend.show.return_value = ["launch", "launch2", "launcher"]
-        exists = ss.check_states(self.run_params, self.env)
+        self.backend.show.return_value = ["launch", "launch2", "launcher", "root"]
+        exists = ss.show_states(self.run_params, self.env)
+        print(self.backend.show.call_args_list)
         call_params = [call.args[0] for call in self.backend.show.call_args_list]
-        self.assertEqual(len(call_params), 3)
+        self.assertEqual(len(call_params), 5)
         self.assertEqual(call_params[0]["vms"], "vm1")
         self.assertEqual(call_params[0]["images"], "image1")
         self.assertEqual(call_params[0]["object_name"], "net1/vm1/image1")
         self.assertEqual(call_params[0]["object_type"], "nets/vms/images")
-        self.assertEqual(call_params[0]["check_state"], "launch")
         self.assertEqual(call_params[1]["vms"], "vm1")
         self.assertEqual(call_params[1]["images"], "image2")
         self.assertEqual(call_params[1]["object_name"], "net1/vm1/image2")
         self.assertEqual(call_params[1]["object_type"], "nets/vms/images")
-        self.assertEqual(call_params[1]["check_state"], "launch2")
-        self.assertEqual(call_params[2]["vms"], "vm2")
-        self.assertEqual(call_params[2]["images"], "image21")
-        self.assertEqual(call_params[2]["object_name"], "net1/vm2/image21")
-        self.assertEqual(call_params[2]["object_type"], "nets/vms/images")
-        self.assertEqual(call_params[2]["check_state"], "launcher")
+        self.assertEqual(call_params[2]["vms"], "vm1")
+        self.assertEqual(call_params[2]["object_name"], "net1/vm1")
+        self.assertEqual(call_params[2]["object_type"], "nets/vms")
+        self.assertEqual(call_params[3]["vms"], "vm2")
+        self.assertEqual(call_params[3]["images"], "image21")
+        self.assertEqual(call_params[3]["object_name"], "net1/vm2/image21")
+        self.assertEqual(call_params[3]["object_type"], "nets/vms/images")
+        self.assertEqual(call_params[4]["vms"], "vm2")
+        self.assertEqual(call_params[4]["object_name"], "net1/vm2")
+        self.assertEqual(call_params[4]["object_type"], "nets/vms")
         self.assertTrue(exists)
-
-        # break on first false state check
-        self.backend.reset_mock()
-        self.backend.show.side_effect = lambda params, _: params.get("images")
-        exists = ss.check_states(self.run_params, self.env)
-        call_params = [call.args[0] for call in self.backend.show.call_args_list]
-        self.assertEqual(len(call_params), 1)
-        self.assertEqual(call_params[0]["vms"], "vm1")
-        self.assertEqual(call_params[0]["images"], "image1")
-        self.assertEqual(call_params[0]["check_state"], "launch")
-        self.assertFalse(exists)
 
     def test_get_multiobj(self):
         """Test that getting various states of multiple vms and their images works."""
@@ -2723,7 +2699,7 @@ class StatesSetupTest(Test):
         self._set_up_generic_params("pop", "state", "objects", "object1")
         self.run_params["skip_types"] = "objects"
 
-        for do in ["check", "get", "set", "unset"]:
+        for do in ["show", "get", "set", "unset"]:
             with self.subTest(f"Testing state type skipping for {do}"):
                 self.run_params[f"{do}_state"] = "launch"
 
