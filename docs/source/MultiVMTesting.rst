@@ -215,8 +215,9 @@ State policies
 
 The ``get_mode``, ``set_mode``, and ``unset_mode`` parameters control how a
 state operation responds to an existing or missing state. Each value contains
-two characters: the first selects the action when the state exists and the
-second selects the action when it does not.
+four characters. The first two select the action when the requested state
+exists and when it is missing. The last two select the action when the
+backend's storage preconditions exist and when they are missing.
 
 The available action letters are:
 
@@ -232,7 +233,7 @@ The available action letters are:
 ``f``
     Force creation, replacement, or removal, depending on the operation.
 
-The valid combinations are:
+The valid actions for the first two characters are:
 
 .. list-table::
    :header-rows: 1
@@ -250,10 +251,11 @@ The valid combinations are:
      - ``r`` or ``f``
      - ``a`` or ``i``
 
-For example, ``get_mode=ra`` reuses an existing state but aborts when it is
-missing. ``set_mode=ff`` overwrites an existing state and creates a missing
-one. Policies may also be specialized for a VM or image with parameters such
-as ``get_mode_images_vm1``.
+For example, ``get_mode=rara`` reuses an existing state and its storage
+preconditions, aborting if either is missing. ``set_mode=ffrf`` overwrites
+an existing state or creates a missing one, reusing existing storage
+preconditions and creating them if necessary. Policies may also be
+specialized for a VM or image with parameters such as ``get_mode_images_vm1``.
 
 The state operation parameters follow the same suffixing rules. Common forms
 include ``get_state``, ``set_state``, and ``unset_state``, together with

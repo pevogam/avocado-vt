@@ -255,7 +255,9 @@ def update(config: dict[str, Any], tag: str = "") -> None:
         setup_dict["nets"] = worker.id
         # NOTE: this makes sure that any present states are overwritten and no recreated
         # states are removed, aborting in any other case
-        setup_dict.update({"get_mode": "ra", "set_mode": "ff", "unset_mode": "fi"})
+        setup_dict.update(
+            {"get_mode": "rarf", "set_mode": "ffrf", "unset_mode": "firi"}
+        )
         setup_str = config["tests_str"]
 
         try:
@@ -738,12 +740,12 @@ def unset(config: dict[str, Any], tag: str = "") -> None:
             continue
         vm = test_object
 
-        # since the default unset_mode is passive (ri) we need a better
+        # since the default unset_mode is passive (riri) we need a better
         # default value for that case but still modifiable by the user
         vm_op_mode = op_mode + "_" + vm.suffix
         state_mode = vm_op_mode if vm_op_mode in setup_dict else op_mode
         if state_mode not in setup_dict:
-            setup_dict[vm_op_mode] = "fi"
+            setup_dict[vm_op_mode] = "firi"
 
     setup_dict.update({"vm_action": operation, "skip_image_processing": "yes"})
 
@@ -770,9 +772,7 @@ def collect(config: dict[str, Any], tag: str = "") -> None:
         tag,
         {
             "get_state_images": "root",
-            "get_mode_images": "ii",
-            # don't touch root states in any way
-            "show_mode_images": "rr",
+            "get_mode_images": "iiri",
             # this manual tool is compatible only with pool
             "pool_scope": "swarm cluster shared",
         },
@@ -792,9 +792,7 @@ def create(config: dict[str, Any], tag: str = "") -> None:
         tag,
         {
             "set_state_images": "root",
-            "set_mode_images": "af",
-            # don't touch root states in any way
-            "show_mode_images": "rr",
+            "set_mode_images": "afri",
             # this manual tool is not compatible with pool
             "pool_scope": "own",
         },
@@ -814,9 +812,7 @@ def clean(config: dict[str, Any], tag: str = "") -> None:
         tag,
         {
             "unset_state_images": "root",
-            "unset_mode_images": "fa",
-            # make use of off switch if vm is running
-            "show_mode_images": "rf",
+            "unset_mode_images": "farf",
             # this manual tool is not compatible with pool
             "pool_scope": "own",
         },

@@ -863,10 +863,10 @@ class IntertestSetupTest(Test):
                 for test_dict in DummyTestRun.asserted_tests:
                     test_dict[operation + "_state_images"] = "^root$"
                     test_dict[operation + "_mode_images"] = (
-                        "^af$" if operation == "set" else "^fa$"
+                        "^afri$" if operation == "set" else "^farf$"
                     )
                     test_dict[operation + "_mode_images"] = (
-                        "^ii$"
+                        "^iiri$"
                         if operation == "get"
                         else test_dict[operation + "_mode_images"]
                     )
