@@ -771,12 +771,11 @@ def collect(config: dict[str, Any], tag: str = "") -> None:
         config,
         tag,
         {
-            "get_state_images": "root",
-            "get_mode_images": "iiri",
+            "show_mode": "ra",
             # this manual tool is compatible only with pool
             "pool_scope": "swarm cluster shared",
         },
-        get,
+        show,
     )
 
 
@@ -791,12 +790,11 @@ def create(config: dict[str, Any], tag: str = "") -> None:
         config,
         tag,
         {
-            "set_state_images": "root",
-            "set_mode_images": "afri",
+            "show_mode": "af",
             # this manual tool is not compatible with pool
             "pool_scope": "own",
         },
-        set,
+        show,
     )
 
 
@@ -811,12 +809,11 @@ def clean(config: dict[str, Any], tag: str = "") -> None:
         config,
         tag,
         {
-            "unset_state_images": "root",
-            "unset_mode_images": "farf",
+            "show_mode": "fa",
             # this manual tool is not compatible with pool
             "pool_scope": "own",
         },
-        unset,
+        show,
     )
 
 

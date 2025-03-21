@@ -768,9 +768,6 @@ class IntertestSetupTest(Test):
         self.config["vm_strs"] = {"vm2": "only Win7\n", "vm3": ""}
         for state_action in ["show", "pop", "push", "get", "set", "unset"]:
             with self.subTest(f"Manual state {state_action}"):
-                DummyStateControl.asserted_states["get"] = {
-                    "root": {self.shared_pool: 0}
-                }
                 DummyTestRun.asserted_tests = [
                     # the order does not diverge (which is desirable here) since similar nodes are not bridged
                     {
@@ -819,8 +816,7 @@ class IntertestSetupTest(Test):
                 )
 
         for state_action in ["collect", "create", "clean"]:
-            operation = "set" if state_action == "create" else "unset"
-            operation = "get" if state_action == "collect" else operation
+            operation = "show"
             with self.subTest(f"Manual state {state_action}"):
                 DummyTestRun.asserted_tests = [
                     # the order does not diverge (which is desirable here) since similar nodes are not bridged
@@ -861,14 +857,13 @@ class IntertestSetupTest(Test):
                     },
                 ]
                 for test_dict in DummyTestRun.asserted_tests:
-                    test_dict[operation + "_state_images"] = "^root$"
-                    test_dict[operation + "_mode_images"] = (
-                        "^afri$" if operation == "set" else "^farf$"
+                    test_dict[operation + "_mode"] = (
+                        "^af$" if state_action == "create" else "^ra$"
                     )
-                    test_dict[operation + "_mode_images"] = (
-                        "^iiri$"
-                        if operation == "get"
-                        else test_dict[operation + "_mode_images"]
+                    test_dict[operation + "_mode"] = (
+                        "^fa$"
+                        if state_action == "clean"
+                        else test_dict[operation + "_mode"]
                     )
                 setup_func = getattr(intertest_setup, state_action)
                 setup_func(self.config, "5m")
