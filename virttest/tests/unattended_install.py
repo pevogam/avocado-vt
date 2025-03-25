@@ -707,7 +707,7 @@ class UnattendedInstallConfig(object):
         way to get fully automated setup without resorting to kernel params
         is to add a preseed.cfg file at the root of the initrd image.
         """
-        LOG.debug("Remastering initrd.gz file with preseed file")
+        LOG.debug("Remastering initrd file with preseed file")
         dest_fname = "preseed.cfg"
         remaster_path = os.path.join(self.image_path, "initrd_remaster")
         if not os.path.isdir(remaster_path):
@@ -715,15 +715,26 @@ class UnattendedInstallConfig(object):
 
         base_initrd = os.path.basename(self.initrd)
         os.chdir(remaster_path)
-        process.run(
-            "gzip -d < ../%s | fakeroot cpio --extract --make-directories "
-            "--no-absolute-filenames" % base_initrd,
-            verbose=DEBUG,
-            shell=True,
-        )
+
+        # Check the initramfs archive format
+        file_cmd = "file -i ../%s" % base_initrd
+        file_output = process.run(file_cmd, verbose=DEBUG, shell=True).stdout_text
+        if "gzip" in file_output:
+            unpack_cmd = "gzip -d < ../" + base_initrd
+        elif "bzip2" in file_output:
+            unpack_cmd = "bzip2 -d < ../" + base_initrd
+        elif "xz" in file_output:
+            unpack_cmd = "xz -d < ../" + base_initrd
+        elif "x-cpio" in file_output:
+            unpack_cmd = "cat ../" + base_initrd
+        else:
+            raise ValueError("Unsupported initramfs format: %s" % file_output)
+        unpack_cmd += " | fakeroot cpio --extract --make-directories --no-absolute-filenames"
+
+        process.run(unpack_cmd, verbose=DEBUG, shell=True)
         process.run("cp %s %s" % (self.unattended_file, dest_fname), verbose=DEBUG)
 
-        # For libvirt initrd.gz will be renamed to initrd.img in setup_cdrom()
+        # For libvirt initrd will be renamed to initrd.img in setup_cdrom()
         process.run(
             "find . | fakeroot cpio -H newc --create | gzip -9 > ../%s" % base_initrd,
             verbose=DEBUG,
