@@ -20,7 +20,8 @@ basedir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if os.path.isdir(os.path.join(basedir, "virttest")):
     sys.path.append(basedir)
 
-from virttest import cartesian_config, propcan, utils_misc, utils_net, utils_params
+from virttest import propcan, utils_misc, utils_net, utils_params
+from virttest.cartconf import Parser
 from virttest.unittest_utils import mock
 
 # Disable some pylint checks for selftests
@@ -413,7 +414,7 @@ class TestVmNetSubclasses(Test):
         utils_net.VirtIface.LASTBYTE = -1
         # These warnings are annoying during testing
         utils_net.VMNet.DISCARD_WARNINGS - 1
-        parser = cartesian_config.Parser()
+        parser = Parser()
         parser.parse_string(self.nettests_cartesian)
         self.CartesianResult = []
         for d in parser.get_dicts():
