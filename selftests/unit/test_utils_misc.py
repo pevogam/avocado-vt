@@ -8,13 +8,14 @@ from unittest import mock as unittest_mock
 
 from avocado import Test
 from avocado.utils import process
+from cartconf.parser import Parser
 
 # simple magic for using scripts within a source tree
 basedir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if os.path.isdir(os.path.join(basedir, "virttest")):
     sys.path.append(basedir)
 
-from virttest import build_helper, cartesian_config, utils_misc, utils_package
+from virttest import build_helper, utils_misc
 from virttest.unittest_utils import mock
 
 
@@ -99,7 +100,7 @@ git_repo_foo_branch = next
 git_repo_foo_lbranch = local
 git_repo_foo_commit = bc732ad8b2ed8be52160b893735417b43a1e91a8
 """
-        config_parser = cartesian_config.Parser()
+        config_parser = Parser()
         config_parser.parse_string(config)
         params = next(config_parser.get_dicts())
 

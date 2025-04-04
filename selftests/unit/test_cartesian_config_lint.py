@@ -10,7 +10,7 @@ else:
 
 from avocado import Test, skipIf
 
-from virttest import cartesian_config
+from cartconf.parser import Parser
 
 BASEDIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 RHELDIR = os.path.join(BASEDIR, "shared", "cfg", "guest-os", "Linux", "RHEL")
@@ -18,6 +18,14 @@ UNATTENDEDDIR = os.path.join(BASEDIR, "shared", "unattended")
 
 
 class CartesianCfgLint(Test):
+    """
+    Test minimal required standards for our Cartesian configuration files.
+
+    These files are parsed and the Cartesian configuration functionality is
+    provided by an avocado plugin but the standards are local to RHEL isos,
+    password treatment, and other VT scope requirements.
+    """
+
     @staticmethod
     def get_cfg_as_dict(path, drop_only=True, drop_conditional_assigment=True):
         """
@@ -43,7 +51,7 @@ class CartesianCfgLint(Test):
             ]
         lines.insert(0, "variants:")
         content = "\n".join(lines)
-        parser = cartesian_config.Parser()
+        parser = Parser()
         parser.parse_string(content)
         dicts = [d for d in parser.get_dicts()]
         len_dicts = len(dicts)

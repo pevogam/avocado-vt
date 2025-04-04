@@ -10,8 +10,9 @@ if os.path.isdir(os.path.join(basedir, "virttest")):
     sys.path.append(basedir)
 
 from avocado import Test
+from cartconf.parser import Parser
 
-from virttest import cartesian_config, installer
+from virttest import installer
 
 
 class installer_test(Test):
@@ -54,7 +55,7 @@ vm_type = test"""
 
         installer.INSTALLER_REGISTRY.register("test_install_mode", Installer, "test")
 
-        config_parser = cartesian_config.Parser()
+        config_parser = Parser()
         config_parser.parse_string(config)
         params = next(config_parser.get_dicts())
 
