@@ -449,7 +449,7 @@ class QCOW2ImageTransfer(StateBackend):
         return image_path
 
     @classmethod
-    def check_root(cls, params: Params, object: Any = None) -> bool:
+    def check(cls, params: Params, object: Any = None) -> bool:
         """
         Check whether a root state or essentially the object exists.
 
@@ -476,7 +476,7 @@ class QCOW2ImageTransfer(StateBackend):
             return False
 
     @classmethod
-    def get_root(cls, params: Params, object: Any = None) -> None:
+    def download(cls, params: Params, object: Any = None) -> None:
         """
         Get a root state or essentially due to pre-existence do nothing.
 
@@ -496,7 +496,7 @@ class QCOW2ImageTransfer(StateBackend):
         cls.ops.download(target_image, src_image_name, params)
 
     @classmethod
-    def set_root(cls, params: Params, object: Any = None) -> None:
+    def initialize(cls, params: Params, object: Any = None) -> None:
         """
         Set a root state to provide object existence.
 
@@ -516,7 +516,7 @@ class QCOW2ImageTransfer(StateBackend):
         cls.ops.upload(target_image, dst_image_name, params)
 
     @classmethod
-    def unset_root(cls, params: Params, object: Any = None) -> None:
+    def finalize(cls, params: Params, object: Any = None) -> None:
         """
         Unset a root state to prevent object existence.
 
@@ -756,36 +756,33 @@ class RootSourcedStateBackend(StateBackend):
     transport = QCOW2ImageTransfer
 
     @classmethod
-    def check_root(
-        cls, params: Params, object: Any = None
-    ) -> list["TestObject"] | bool:
+    def check(cls, params: Params, object: Any = None) -> list["TestObject"] | bool:
         """
         Check whether a root state or essentially the object exists.
 
         All arguments match the base class.
         """
-        local_root_exists = cls._check_root(params, object)
+        local_root_exists = cls._check(params, object)
         if params["pool_scope"] == "own":
             return local_root_exists
-        pool_root_exists = cls.transport.check_root(params, object)
+        pool_root_exists = cls.transport.check(params, object)
         return local_root_exists or pool_root_exists
 
     @classmethod
-    def get_root(cls, params: Params, object: Any = None) -> None:
+    def download(cls, params: Params, object: Any = None) -> None:
         """
         Get a root state or essentially due to pre-existence do nothing.
 
         All arguments match the base class.
         """
         if "own" not in params["pool_scope"]:
-            cls.transport.get_root(params, object)
+            cls.transport.download(params, object)
             return
         elif params["pool_scope"] == "own":
-            cls._get_root(params, object)
             return
 
-        local_root_exists = cls._check_root(params, object)
-        pool_root_exists = cls.transport.check_root(params, object)
+        local_root_exists = cls._check(params, object)
+        pool_root_exists = cls.transport.check(params, object)
 
         if pool_root_exists:
             if local_root_exists:
@@ -813,11 +810,10 @@ class RootSourcedStateBackend(StateBackend):
             else:
                 cache_valid = False
             if not cache_valid:
-                cls.transport.get_root(params, object)
-        cls._get_root(params, object)
+                cls.transport.download(params, object)
 
     @classmethod
-    def set_root(cls, params: Params, object: Any = None) -> None:
+    def initialize(cls, params: Params, object: Any = None) -> None:
         """
         Set a root state to provide object existence.
 
@@ -826,17 +822,17 @@ class RootSourcedStateBackend(StateBackend):
         # local and pool root setting are mutually exclusive as we usually want
         # to set the pool root from an existing local root with some states on it
         if params["pool_scope"] == "own":
-            cls._set_root(params, object)
+            cls._initialize(params, object)
         elif params["pool_scope"] == "shared":
-            local_root_exists = cls._check_root(params, object)
+            local_root_exists = cls._check(params, object)
             if not local_root_exists:
                 raise RuntimeError("Updating state pool requires local root states")
-            cls.transport.set_root(params, object)
+            cls.transport.initialize(params, object)
         else:
             raise RuntimeError(f"Invalid pool scope {params['pool_scope']}")
 
     @classmethod
-    def unset_root(cls, params: Params, object: Any = None) -> None:
+    def finalize(cls, params: Params, object: Any = None) -> None:
         """
         Unset a root state to prevent object existence.
 
@@ -845,9 +841,9 @@ class RootSourcedStateBackend(StateBackend):
         # local and pool root setting are mutually exclusive as we usually want
         # to set the pool root from an existing local root with some states on it
         if params["pool_scope"] == "own":
-            cls._unset_root(params, object)
+            cls._finalize(params, object)
         elif params["pool_scope"] == "shared":
-            cls.transport.unset_root(params, object)
+            cls.transport.finalize(params, object)
         else:
             raise RuntimeError(f"Invalid pool scope {params['pool_scope']}")
 

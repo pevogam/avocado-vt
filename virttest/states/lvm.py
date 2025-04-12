@@ -202,7 +202,7 @@ class LVMBackend(StateBackend):
         cls.switch_on(switch, vm)
 
     @classmethod
-    def check_root(cls, params: Params, object: Any = None) -> bool:
+    def check(cls, params: Params, object: Any = None) -> bool:
         """
         Check whether a root state or essentially the object exists.
 
@@ -229,7 +229,7 @@ class LVMBackend(StateBackend):
             return False
 
     @classmethod
-    def set_root(cls, params: Params, object: Any = None) -> None:
+    def initialize(cls, params: Params, object: Any = None) -> None:
         """
         Set a root state to provide object existence.
 
@@ -271,7 +271,7 @@ class LVMBackend(StateBackend):
             )
 
     @classmethod
-    def unset_root(cls, params: Params, object: Any = None) -> None:
+    def finalize(cls, params: Params, object: Any = None) -> None:
         """
         Unset a root state to prevent object existence.
 

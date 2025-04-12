@@ -76,7 +76,7 @@ class VMNetBackend(StateBackend):
         pass
 
     @classmethod
-    def check_root(cls, params: Params, object: Any = None) -> bool:
+    def check(cls, params: Params, object: Any = None) -> bool:
         """
         Check whether a root state or essentially the object exists.
 
@@ -85,17 +85,7 @@ class VMNetBackend(StateBackend):
         return True
 
     @classmethod
-    def get_root(cls, params: Params, object: Any = None) -> None:
-        """
-        Get a root state or essentially due to pre-existence do nothing.
-
-        :param params: configuration parameters
-        :param object: object whose states are manipulated
-        """
-        cls.get(params, object=object)
-
-    @classmethod
-    def set_root(cls, params: Params, object: Any = None) -> None:
+    def initialize(cls, params: Params, object: Any = None) -> None:
         """
         Set a root state to provide object existence.
 
@@ -104,7 +94,7 @@ class VMNetBackend(StateBackend):
         pass
 
     @classmethod
-    def unset_root(cls, params: Params, object: Any = None) -> None:
+    def finalize(cls, params: Params, object: Any = None) -> None:
         """
         Unset a root state to prevent object existence.
 
