@@ -98,7 +98,7 @@ def _on_state(fn: Callable[..., Any], action: str) -> Callable[..., Any]:
     def wrapper(_test: Any, params: Any, env: Any) -> None:
         if action in ("set", "unset"):
             params["pool_scope"] = "own"
-        params["skip_types"] = "nets/vms/images nets"
+        params["skip_types"] = "nets"
         try:
             fn(params, env)
         finally:
@@ -113,7 +113,7 @@ def _off_state(fn: Callable[..., Any], action: str) -> Callable[..., Any]:
     def wrapper(_test: Any, params: Any, env: Any) -> None:
         if action in ("set", "unset"):
             params["pool_scope"] = "own"
-        params["skip_types"] = "nets/vms"
+        params["skip_types"] = "nets/vms nets/vms/images"
         try:
             fn(params, env)
         finally:
