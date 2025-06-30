@@ -24,14 +24,7 @@ from . import setup
 
 def install_default_backends() -> None:
     """Install the state backends used by the multi-VM sample suite."""
-    from . import (
-        btrfs,
-        lvm,
-        lxc,
-        qcow2,
-        ramfile,
-        vmnet,
-    )
+    from . import btrfs, lvm, lxc, qcow2, ramfile, vmnet
 
     setup.BACKENDS = {
         "qcow2": qcow2.QCOW2Backend,
@@ -44,6 +37,7 @@ def install_default_backends() -> None:
         "vmnet": vmnet.VMNetBackend,
     }
     ramfile.RamfileBackend.image_state_backend = qcow2.QCOW2ExtBackend
+    qcow2.QCOW2VTBackend.image_state_backend = qcow2.QCOW2Backend
 
 
 def setup_vmnet_hook(_test: object, params: Params, env: Env) -> None:

@@ -12,7 +12,7 @@ from avocado_vt.plugins.loader import TestLoader
 from avocado_vt.plugins.multivm import MultiVM
 from avocado_vt.plugins.vt_resolver import VTResolver
 from virttest import env_process
-from virttest.states import ramfile
+from virttest.states import qcow2, ramfile
 from virttest.states import setup as state_setup
 from virttest.utils_env import Env
 from virttest.utils_params import Params
@@ -184,6 +184,7 @@ class MultiVMControlTest(unittest.TestCase):
         )
         self.original_backends = state_setup.BACKENDS
         self.original_image_backend = ramfile.RamfileBackend.image_state_backend
+        self.original_qcow2vt_image_backend = qcow2.QCOW2VTBackend.image_state_backend
 
     def tearDown(self):
         (
@@ -194,6 +195,7 @@ class MultiVMControlTest(unittest.TestCase):
         ) = self.original_hooks
         state_setup.BACKENDS = self.original_backends
         ramfile.RamfileBackend.image_state_backend = self.original_image_backend
+        qcow2.QCOW2VTBackend.image_state_backend = self.original_qcow2vt_image_backend
         if not self.utility_was_present and self.utility_path in sys.path:
             sys.path.remove(self.utility_path)
         sys.modules.pop("sample_utility", None)

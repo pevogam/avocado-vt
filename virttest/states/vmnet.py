@@ -1,4 +1,4 @@
-# pylint: disable=docstring-first-line-empty,missing-param-doc,missing-return-doc,redefined-builtin,unnecessary-pass
+# pylint: disable=abstract-method,docstring-first-line-empty,missing-param-doc,missing-return-doc,redefined-builtin,unnecessary-pass
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
@@ -31,22 +31,13 @@ from typing import Any
 from virttest.utils_params import Params
 
 from ..vmnet import VMNetwork, setup_vmnet
-from .setup import StateBackend
+from .composition import NetStateBackend
 
 
-class VMNetBackend(StateBackend):
+class VMNetBackend(NetStateBackend):
     """Backend manipulating network states as VMNet operations."""
 
     network_class = VMNetwork
-
-    @classmethod
-    def show(cls, params: Params, object: Any = None) -> list[str]:
-        """
-        Return a list of available states of a specific type.
-
-        All arguments match the base class.
-        """
-        return ["default"]
 
     @classmethod
     def get(cls, params: Params, object: Any = None) -> None:
@@ -56,48 +47,3 @@ class VMNetBackend(StateBackend):
         All arguments match the base class.
         """
         setup_vmnet(params, object, cls.network_class)
-
-    @classmethod
-    def set(cls, params: Params, object: Any = None) -> None:
-        """
-        Store a state saving the current changes.
-
-        All arguments match the base class.
-        """
-        pass
-
-    @classmethod
-    def unset(cls, params: Params, object: Any = None) -> None:
-        """
-        Remove a state with previous changes.
-
-        All arguments match the base class.
-        """
-        pass
-
-    @classmethod
-    def check(cls, params: Params, object: Any = None) -> bool:
-        """
-        Check whether a root state or essentially the object exists.
-
-        All arguments match the base class.
-        """
-        return True
-
-    @classmethod
-    def initialize(cls, params: Params, object: Any = None) -> None:
-        """
-        Set a root state to provide object existence.
-
-        All arguments match the base class.
-        """
-        pass
-
-    @classmethod
-    def finalize(cls, params: Params, object: Any = None) -> None:
-        """
-        Unset a root state to prevent object existence.
-
-        All arguments match the base class and in addition:
-        """
-        pass

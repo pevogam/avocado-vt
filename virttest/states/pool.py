@@ -13,7 +13,7 @@
 # Author: Plamen Dimitrov <plamen.dimitrov@intra2net.com>
 
 """
-Module for the QCOW2 pool state management backend.
+Module for the pool state management backends.
 
 SUMMARY
 ------------------------------------------------------
@@ -43,7 +43,7 @@ from avocado.utils import crypto
 from virttest.qemu_storage import QemuImg
 from virttest.utils_params import Params
 
-from .setup import StateBackend
+from .composition import StateBackend
 
 logging = log.getLogger("avocado.job." + __name__)
 
