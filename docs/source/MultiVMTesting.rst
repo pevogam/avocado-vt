@@ -71,6 +71,26 @@ boot when restoring a VM, while an image backend is usually more suitable for
 multi-disk layouts. Not every backend supports every device type or storage
 layout, so select one according to the suite and host environment.
 
+State management also requires backend-specific preconditions:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Backend
+     - Required storage
+   * - ``ramfile``
+     - A state directory and the preconditions of its image backend.
+   * - ``qcow2ext``
+     - An image directory containing the external snapshot files.
+   * - ``qcow2vt`` and ``qcow2``
+     - A QCOW2 image file.
+   * - ``lvm``
+     - A logical volume in its volume group and the associated QCOW2 images.
+
+These storage preconditions are separate from whether the VM is running.
+The ``boot`` state represents a running VM; ``root`` represents the storage
+needed to manage its states.
+
 An externally managed or manually prepared VM can also be represented as a
 permanent VM. Its known starting states become roots from which Avocado-VT
 may create disposable test states without modifying the original setup.
@@ -203,7 +223,7 @@ Core environment steps include:
 * ``start`` and ``stop`` for configured workers;
 * ``create``, ``collect``, ``boot``, ``shutdown``, ``clean``, and ``update``
   for VM and object lifecycle operations;
-* ``check``, ``get``, ``set``, ``unset``, ``push``, and ``pop`` for states;
+* ``show``, ``get``, ``set``, ``unset``, ``push``, and ``pop`` for states;
 * ``upload``, ``download``, and ``control`` for data and control-file
   operations.
 
@@ -256,6 +276,13 @@ preconditions, aborting if either is missing. ``set_mode=ffrf`` overwrites
 an existing state or creates a missing one, reusing existing storage
 preconditions and creating them if necessary. Policies may also be
 specialized for a VM or image with parameters such as ``get_mode_images_vm1``.
+
+Storage preconditions are managed through ``show_states()`` and its
+two-character ``show_mode`` policy. Its first character accepts ``a``
+(abort), ``r`` (reuse), or ``f`` (remove) when preconditions exist; its second
+accepts ``a`` (abort), ``i`` (ignore), or ``f`` (create) when they are missing.
+The get, set, and unset operations pass their final two policy characters to
+this operation before accessing a state.
 
 The state operation parameters follow the same suffixing rules. Common forms
 include ``get_state``, ``set_state``, and ``unset_state``, together with
