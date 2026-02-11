@@ -5,6 +5,8 @@ readonly test_suite="${TEST_SUITE:-/root/avocado-vt-libs/tp_multivm}"
 readonly test_results="${TEST_RESULTS:-/mnt/local/results/upstream}"
 readonly vt_config="${VT_CONFIG:-/etc/avocado/conf.d/vt.conf}"
 
+readonly ims="mnt/local/images"
+
 # local environment preparation
 echo
 echo "Configure locally the current plugin source and prepare to run"
@@ -48,8 +50,15 @@ if [ ! -e "$vt_config" ] && [ ! -L "$vt_config" ]; then
 fi
 sed --follow-symlinks -i "s#suite_path = .*#suite_path = ${test_suite}#" "${vt_config}"
 rm ${HOME}/avocado_overwrite_* -fr
-rm -fr /mnt/local/images/swarm/*
-rm -fr /mnt/local/images/shared/vm1-* /mnt/local/images/shared/vm2-*
+rm -fr /$ims/c10*/rootfs/$ims/*
+rm -fr /$ims/swarm/*
+rm -fr /$ims/shared/vm1-* /$ims/shared/vm2-*
+test_slots="net1,net2,net3,net4,net5"
+containers="$(printf $test_slots | sed "s/,/ /g" | sed "s/net/10/g")"
+for cid in $containers; do
+    lxc-stop c$cid || echo "Container c$cid already stopped"
+    lxc-start c$cid || echo "Container c$cid already started"
+done
 
 # minimal other dependencies for the integration run
 dnf install -y python3-lxc
@@ -69,7 +78,7 @@ avocado run \
 echo
 echo -e "\033[35mPerform LXC-isolated parallel VT integration run\033[0m"
 for cid in c101 c102; do
-    lxc-start $cid
+    lxc-start $cid || echo "Container $cid already started"
     lxc-attach $cid -- avocado vt-bootstrap --vt-type=qemu --yes-to-all
     lxc-attach $cid -- iptables -I INPUT -i virbr0 -p udp --dport 67 -j ACCEPT
     lxc-attach $cid -- iptables -I INPUT -i virbr0 -p udp --dport 53 -j ACCEPT
@@ -98,7 +107,6 @@ avocado env setup=list
 echo
 echo -e "\033[35mPerform a full multi-vm test suite run via autotest interface\033[0m"
 avocado_cmd="avocado env"
-test_slots="net1,net2,net3,net4,net5"
 $avocado_cmd setup=run nets=$test_slots only=leaves only_vm1=
 
 # custom checks
@@ -113,15 +121,13 @@ test $(ls -A1q "$test_results/latest/test-results" | grep tutorial_finale.getset
 
 echo
 echo "Check if all containers have identical and synced states after the run"
-ims="mnt/local/images"
-containers="$(printf $test_slots | sed "s/,/ /g" | sed "s/net/10/g")"
 for cid in $containers; do
     diff -r /$ims/c101/rootfs/$ims /$ims/c$cid/rootfs/$ims -x el8-64* -x f40-64* -x win10-64* -x vm3 || (echo "Different states found at ${cid}" && exit 1)
 done
 # verify that either vm1/vm2 shared pool doesn't exist or is empty for the validity of our tests
-ls -A1q /mnt/local/images/shared/vm1-* 2>/dev/null | grep -q . && (echo "Unexpected vm1 images in the shared pool" && exit 1)
-ls -A1q /mnt/local/images/shared/vm2-* 2>/dev/null | grep -q . && (echo "Unexpected vm2 images in the shared pool" && exit 1)
-ls -A1q /mnt/local/images/shared/vm3* | grep -q . || (echo "Missing vm3 images in the shared pool" && exit 1)
+ls -A1q /$ims/shared/vm1-* 2>/dev/null | grep -q . && (echo "Unexpected vm1 images in the shared pool" && exit 1)
+ls -A1q /$ims/shared/vm2-* 2>/dev/null | grep -q . && (echo "Unexpected vm2 images in the shared pool" && exit 1)
+ls -A1q /$ims/shared/vm3* | grep -q . || (echo "Missing vm3 images in the shared pool" && exit 1)
 ls -A1q "$test_results/latest/test-results" | grep -q CentOS | grep -q net5 && (echo "The worker net5 should never run CentOS tests" && exit 1)
 ls -A1q "$test_results/latest/test-results" | grep -q Win7 | grep -q net5 && (echo "The worker net5 should never run Win7 tests" && exit 1)
 ls -A1q "$test_results/latest/test-results" | grep -q Fedora | grep -q net5 && (echo "The worker net5 should still run Fedora tests" && exit 1)
@@ -149,8 +155,8 @@ test -d "$test_results"/latest/test-results || (echo "Passing tests were not rep
 
 echo
 echo "Testing a mix of shared pool and serial run"
-ls -A1q /mnt/local/images/shared/vm1-* 2>/dev/null | grep -q . && (echo "Unexpected vm1 images in the shared pool found" && exit 1)
-mv /mnt/local/images/swarm/vm1-* /mnt/local/images/shared/
+ls -A1q /$ims/shared/vm1-* 2>/dev/null | grep -q . && (echo "Unexpected vm1 images in the shared pool found" && exit 1)
+mv /$ims/swarm/vm1-* /$ims/shared/
 $avocado_cmd setup=run only=tutorial1 nets=net0
 test -d "$test_results"/latest/test-results || (echo "No serial tests found" && exit 1)
 ls -A1q "$test_results/latest/test-results" | grep -q install && (echo "Unwanted install test found and shared pool wasn't reused" && exit 1)
