@@ -99,6 +99,7 @@ class VirtTest(test.VirtTest):
             if "avocado_test_" in self.logdir:
                 self._save_log_dir()
             try:
+                # TODO: could we not put the finished message in some cases?
                 self.queue.put(
                     messages.FinishedMessage.get(
                         status,
@@ -160,6 +161,22 @@ class VTTestRunner(BaseRunner):
                 process.start()
                 while True:
                     time.sleep(RUNNER_RUN_CHECK_INTERVAL)
+                    if process.exitcode is not None:
+                        yield messages.LogMessage.get(
+                            f"Process {process.name} is alive with PID {process.pid} and exit {process.exitcode}",
+                        )
+
+                    if not process.is_alive() and queue.empty():
+                        # Child died without sending finished message
+                        exitcode = process.exitcode
+                        if exitcode is not None and exitcode < 0:
+                            reason = f"Process killed by signal {-exitcode}"
+                        else:
+                            reason = f"Process died unexpectedly (exitcode={exitcode})"
+                        yield messages.StderrMessage.get(reason)
+                        yield messages.FinishedMessage.get("error", fail_reason=reason)
+                        break
+
                     if queue.empty():
                         yield messages.RunningMessage.get()
                     else:
