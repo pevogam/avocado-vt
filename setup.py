@@ -59,7 +59,7 @@ def get_data_files():
         return [((get_dir(installed_location, level)), files_found)]
 
     data_files = []
-    data_files_dirs = ['tp_folder']
+    data_files_dirs = ["tp_multivm"]
 
     for data_file_dir in data_files_dirs:
         for root, dirs, files in os.walk(data_file_dir):
