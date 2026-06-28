@@ -48,6 +48,7 @@ requirements: pip
 check:
 	git submodule update --init --recursive
 	pre-commit run --all-files
+	python3 selftests/run
 
 clean:
 	rm -rf MANIFEST BUILD BUILDROOT SPECS RPMS SRPMS SOURCES PYPI_UPLOAD build dist

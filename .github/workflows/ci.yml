@@ -56,8 +56,15 @@ jobs:
          touch /tmp/dummy_bin/tcpdump
          chmod 777 /tmp/dummy_bin/*
          echo "/tmp/dummy_bin" >> $GITHUB_PATH
-      - name: Setup Avocado-vt for functional tests
-        run: AVOCADO_LOG_DEBUG=yes avocado vt-bootstrap --vt-skip-verify-download-assets --yes-to-all
+      - name: Minimal isolation (unit) tests
+        run: |
+          python3 selftests/run
+      - name: Setup Avocado-vt for integration tests
+        run: AVOCADO_LOG_DEBUG=yes avocado vt-bootstrap --vt-type=qemu --yes-to-all
+      - name: Minimal integration (functional) tests
+        run: |
+          AVOCADO_LOG_DEBUG=yes avocado list --vt-type qemu
+          # AVOCADO_LOG_DEBUG=yes avocado run io-github-autotest-qemu.reboot
       - run: echo "This job's status is ${{ job.status }}."
 
   package-build:
