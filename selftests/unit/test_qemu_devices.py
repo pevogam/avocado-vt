@@ -20,6 +20,7 @@ if os.path.isdir(os.path.join(basedir, "virttest")):
 import six
 from six.moves import xrange
 
+from avocado import Test
 from virttest import qemu_monitor
 from virttest.qemu_devices import qcontainer, qdevices
 from virttest.unittest_utils import mock
@@ -66,7 +67,7 @@ class MockHMPMonitor(qemu_monitor.HumanMonitor):
         pass
 
 
-class Devices(unittest.TestCase):
+class Devices(Test):
     """set of qemu devices tests"""
 
     def test_q_base_device(self):
@@ -147,7 +148,7 @@ class Devices(unittest.TestCase):
         self.assertEqual(out, exp, "QMP command corrupted:\n%s\n%s" % (out, exp))
 
 
-class Buses(unittest.TestCase):
+class Buses(Test):
     """Set of bus-representation tests"""
 
     def test_q_sparse_bus(self):
@@ -666,7 +667,7 @@ Slots:
         self.assertEqual("usb1.0(uhci): {1:a'usb-kbd',2:a'usb-kbd'}", hub3.str_short())
 
 
-class Container(unittest.TestCase):
+class Container(Test):
     """Tests related to the abstract representation of qemu machine"""
 
     def setUp(self):

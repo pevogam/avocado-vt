@@ -10,6 +10,7 @@ import sys
 import time
 import unittest
 
+from avocado import Test
 from avocado.utils import process
 from six.moves import xrange
 
@@ -43,7 +44,7 @@ class FakeVm(object):
         logging.info("Fake VM %s (instance %s)", self.name, self.instance)
 
 
-class TestBridge(unittest.TestCase):
+class TestBridge(Test):
     class FakeCmd(object):
         iter = 0
 
@@ -131,7 +132,7 @@ virbr2        8000.525400c0b080    yes        em1
         self.god.unstub_all()
 
 
-class TestVirtIface(unittest.TestCase):
+class TestVirtIface(Test):
 
     VirtIface = utils_net.VirtIface
 
@@ -234,7 +235,7 @@ class TestLibvirtIface(TestVirtIface):
         self.VirtIface = utils_net.LibvirtIface
 
 
-class TestVmNetStyle(unittest.TestCase):
+class TestVmNetStyle(Test):
     def setUp(self):
         logging.disable(logging.INFO)
         logging.disable(logging.WARNING)
@@ -256,7 +257,7 @@ class TestVmNetStyle(unittest.TestCase):
         self.assert_(issubclass(style["container_class"], utils_net.VirtIface))
 
 
-class TestVmNet(unittest.TestCase):
+class TestVmNet(Test):
     def setUp(self):
         logging.disable(logging.INFO)
         logging.disable(logging.WARNING)
@@ -290,7 +291,7 @@ class TestVmNet(unittest.TestCase):
         self.assertEqual(test_data[2]["mac"], vmnet[2]["mac"])
 
 
-class TestVmNetSubclasses(unittest.TestCase):
+class TestVmNetSubclasses(Test):
 
     nettests_cartesian = """
     variants:
