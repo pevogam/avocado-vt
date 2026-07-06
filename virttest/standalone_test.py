@@ -3,7 +3,7 @@ import os
 from avocado.utils import path as utils_path
 
 from . import data_dir
-from .cartconf import Parser
+from .cartconf import IS_VARIANTER, Parser
 from .compat import get_opt
 
 GUEST_NAME_LIST = None
@@ -97,8 +97,7 @@ def get_cartesian_parser_details(cartesian_parser):
     details += "Tests produced by config file %s\n\n" % cartesian_parser.filename
 
     details += "CartConf version: "
-    is_varianter = not hasattr(cartesian_parser, "only_filters")
-    if is_varianter:
+    if IS_VARIANTER:
         details += "external varianter (dependency)"
     else:
         details += "native VT module (blob)"
@@ -106,7 +105,7 @@ def get_cartesian_parser_details(cartesian_parser):
 
     details += "The full test list was modified by the following:\n\n"
 
-    if is_varianter:
+    if IS_VARIANTER:
         details += cartesian_parser.node.dump(0, recurse=True)
         return details
 
