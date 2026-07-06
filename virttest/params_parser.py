@@ -32,8 +32,8 @@ import logging
 import os
 
 from avocado.core.settings import settings
+from cartconf.parser import Parser
 
-from virttest import cartesian_config
 from virttest.utils_params import Params
 
 log = logging.getLogger("avocado.job." + __name__)
@@ -336,7 +336,7 @@ class Reparsable:
         show_dict_fullname: bool = False,
         show_dict_contents: bool = False,
         show_empty_cartesian_product: bool = True,
-    ) -> cartesian_config.Parser:
+    ) -> Parser:
         """
         Get a basic parameters parser with its dictionaries.
 
@@ -349,7 +349,7 @@ class Reparsable:
         :returns: resulting parser
         :raises: :py:class:`EmptyCartesianProduct` if no combination of the restrictions exists
         """
-        parser = cartesian_config.Parser()
+        parser = Parser()
         hostname = os.environ.get("PREFIX", os.environ.get("HOSTNAME", "avocado"))
         parser.parse_string("hostname = %s\n" % hostname)
         suite_path = settings.as_dict().get("vt.common.suite_path")
@@ -383,18 +383,19 @@ class Reparsable:
                 try:
                     peek_dict = peek_generator.__next__()
                     if show_dictionaries:
-                        cartesian_config.print_dicts(
+                        # TODO: this requires access to the parse python script
+                        print_dicts(
                             options(False, show_dict_fullname, show_dict_contents),
                             (peek_dict,),
                         )
-                        cartesian_config.print_dicts(
+                        print_dicts(
                             options(False, show_dict_fullname, show_dict_contents),
                             peek_generator,
                         )
                 except StopIteration:
                     raise EmptyCartesianProduct(str(self)) from None
             else:
-                cartesian_config.print_dicts(
+                print_dicts(
                     options(False, show_dict_fullname, show_dict_contents),
                     peek_generator,
                 )
