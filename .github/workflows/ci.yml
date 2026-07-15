@@ -46,6 +46,46 @@ jobs:
          python -m pip install --upgrade pip
          pip install 'setuptools-rust==1.1.2'
          pip install -e .
+      - name: Patch Avocado nrunner status server cleanup
+        run: |
+         python3 - <<'PY'
+         from pathlib import Path
+
+         path = Path("avocado-libs/avocado/plugins/runner_nrunner.py")
+         text = path.read_text()
+         old = "\n".join([
+             "        # Cancel pending asyncio tasks before closing",
+             "        for task_attr in ('status_updater_task', 'status_server_task'):",
+             "            task = getattr(self, task_attr, None)",
+             "            if task:",
+             "                if not task.done():",
+             "                    task.cancel()",
+             "                    try:",
+             "                        loop.run_until_complete(task)",
+             "                    except asyncio.CancelledError:",
+             "                        pass",
+             "        self.status_server.close()",
+             "",
+         ])
+         new = "\n".join([
+             "        # Close the server before waiting for its serve_forever task cancellation.",
+             "        self.status_server.close()",
+             "        # Cancel pending asyncio tasks before closing",
+             "        for task_attr in ('status_updater_task', 'status_server_task'):",
+             "            task = getattr(self, task_attr, None)",
+             "            if task:",
+             "                if not task.done():",
+             "                    task.cancel()",
+             "                    try:",
+             "                        loop.run_until_complete(task)",
+             "                    except asyncio.CancelledError:",
+             "                        pass",
+             "",
+         ])
+         if old not in text:
+             raise SystemExit("Unable to patch Avocado nrunner cleanup")
+         path.write_text(text.replace(old, new, 1))
+         PY
       - name: Finish installing dependencies
         run: |
          pip install -e .
@@ -68,10 +108,92 @@ jobs:
             avocado-vt-images-${{ runner.os }}-
       - name: Set up Avocado VT for integration tests
         run: AVOCADO_LOG_DEBUG=yes avocado vt-bootstrap --vt-type=qemu --yes-to-all
+      - name: Debug Python asyncio subprocess mode
+        run: |
+         python3 - <<'PY'
+         import asyncio
+         import os
+         import platform
+         import sys
+
+         print("python:", sys.version)
+         print("executable:", sys.executable)
+         print("platform:", platform.platform())
+         print("kernel:", platform.release())
+         print("has pidfd_open:", hasattr(os, "pidfd_open"))
+         print("event loop policy:", type(asyncio.get_event_loop_policy()))
+
+         policy = asyncio.get_event_loop_policy()
+         try:
+             print("child watcher:", type(policy.get_child_watcher()))
+         except Exception as exc:
+             print("child watcher unavailable:", repr(exc))
+         PY
       - name: Minimal isolation (unit) tests
         run: python3 selftests/run -v
       - name: Minimal integration (functional) tests
-        run: AVOCADO_LOG_DEBUG=yes avocado -V run --dry-run --vt-type qemu "only reboot"
+        run: |
+         cat > /tmp/avocado_debug.py <<'PY'
+         import asyncio
+         import faulthandler
+         import signal
+         import sys
+         import traceback
+
+         faulthandler.enable(all_threads=True)
+
+
+         def dump(signum, frame):
+             print("\n=== Python stacks ===", file=sys.stderr, flush=True)
+             faulthandler.dump_traceback(file=sys.stderr, all_threads=True)
+             try:
+                 loop = asyncio.get_event_loop()
+                 tasks = asyncio.all_tasks(loop)
+             except Exception as exc:
+                 print(
+                     f"asyncio tasks unavailable: {exc!r}",
+                     file=sys.stderr,
+                     flush=True,
+                 )
+             else:
+                 print(
+                     f"\n=== asyncio tasks: {len(tasks)} ===",
+                     file=sys.stderr,
+                     flush=True,
+                 )
+                 for task in tasks:
+                     print(f"\n{task!r}", file=sys.stderr, flush=True)
+                     for stack in task.get_stack():
+                         traceback.print_stack(stack, file=sys.stderr)
+
+
+         signal.signal(signal.SIGUSR1, dump)
+
+         from avocado.core.main import main
+
+         raise SystemExit(main())
+         PY
+
+         AVOCADO_LOG_DEBUG=yes PYTHONASYNCIODEBUG=1 python /tmp/avocado_debug.py -V run --dry-run --vt-type qemu "only reboot" &
+         avocado_pid=$!
+
+         (
+           sleep 120
+           ps -ef --forest || ps -ef
+           kill -USR1 "$avocado_pid" || true
+           sleep 10
+           kill -TERM "$avocado_pid" || true
+           sleep 5
+           kill -KILL "$avocado_pid" || true
+         ) &
+         watchdog_pid=$!
+
+         set +e
+         wait "$avocado_pid"
+         status=$?
+         set -e
+         kill "$watchdog_pid" || true
+         exit "$status"
       - run: echo "This job's status is ${{ job.status }}."
 
   package-build:
