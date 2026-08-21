@@ -108,7 +108,7 @@ if __name__ == "__main__":
             "avocado.plugins.cli": [
                 "vt-list = avocado_vt.plugins.vt_list:VTLister",
                 "vt = avocado_vt.plugins.vt:VTRun",
-                "auto = avocado_vt.plugins.auto:Auto",
+                "multivm = avocado_vt.plugins.multivm:MultiVM",
             ],
             "avocado.plugins.cli.cmd": [
                 "vt-bootstrap = avocado_vt.plugins.vt_bootstrap:VTBootstrap",

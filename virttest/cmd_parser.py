@@ -29,33 +29,56 @@ INTERFACE
 import logging
 import os
 import re
+import shlex
 import sys
-from typing import Any, Callable
 
 from avocado.core.settings import settings
 
-from avocado_vt.test import VirtTest
-from virttest import env_process
-from virttest.utils_env import Env
 from virttest.utils_params import Params
 
 from . import params_parser as param
 from .cartgraph import graph
-from .states import setup as ss
 
 log = logging.getLogger("avocado.job." + __name__)
 
 
-def params_from_cmd(config: Params) -> None:
+def _params_from_reference(reference: str | None) -> list[str]:
+    """Convert an Avocado VT reference into Cartesian command parameters."""
+    if not reference or not reference.strip():
+        return []
+
+    params = []
+    for line in reference.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        restriction = re.match(r"^(only|no)\s+(.+)$", line)
+        if restriction:
+            params.append(f"{restriction.group(1)}={restriction.group(2)}")
+        elif "=" in line:
+            params.extend(shlex.split(line))
+        else:
+            params.append(f"only={line}")
+    return params
+
+
+def params_from_cmd(
+    config: Params,
+    reference: str | None = None,
+    extra_params: list[str] | None = None,
+) -> None:
     """
     Produce Cartesian parameters from a command line.
 
-    Take care of paths/utilities for all host controls.
-
     :param config: command line arguments
+    :param reference: optional VT Cartesian test restriction
+    :param extra_params: additional ``KEY=VALUE`` parameter assignments
     :raises: :py:class:`ValueError` if a command line selected vm is not available
              from the configuration and thus supported or internal tests are
              restricted from the command line
+
+    Keep default and custom restrictions, ordinary parameters, and VT option-derived
+    overrides in one parsing path.
 
     .. todo:: Any dynamically created config keys here are usually entire data
         structures like dictionaries and lists and only used internally during
@@ -65,9 +88,6 @@ def params_from_cmd(config: Params) -> None:
         some standards for doing this first. Until then, the user won't directly
         interact with these keys anyway.
     """
-    suite_path = settings.as_dict().get("vt.common.suite_path", ".")
-    sys.path.insert(1, os.path.join(suite_path, "utils"))
-
     # validate typed vm names and possible vm specific restrictions
     available_vms = param.all_objects("vms")
     available_restrictions = param.all_restrictions()
@@ -83,8 +103,14 @@ def params_from_cmd(config: Params) -> None:
     # the tests string includes the test restrictions while the vm strings include the ones for the vm variants
     tests_str, nets_str, vm_strs = "", "", {vm: "" for vm in available_vms}
 
+    # establish order of precedence of the Cartesian command parameters collected from various channels
+    # among which we support newer reference + extra parameters and older config parameters (last)
+    cmd_params = _params_from_reference(reference)
+    cmd_params.extend(extra_params or [])
+    cmd_params.extend(config.get("params") or [])
+
     # main tokenizing loop
-    for cmd_param in config["params"]:
+    for cmd_param in cmd_params:
         re_param = re.match(r"(\w+)=(.*)", cmd_param)
         if re_param is None:
             raise ValueError(
@@ -190,28 +216,28 @@ def params_from_cmd(config: Params) -> None:
 
     # log into files for each major level the way it was done for autotest
     config["job.run.store_logging_stream"] = ["avocado.core:DEBUG"]
+
+
+def configure_runtime(config: Params, use_states: bool = True) -> None:
+    """
+    Configure controller-side utilities, logging, and environment hooks.
+
+    :param config: command line arguments
+    :param use_states: whether to install object state lifecycle hooks
+    """
+    suite_path = settings.as_dict().get("vt.common.suite_path", ".")
+    utility_path = os.path.join(suite_path, "utils")
+    if utility_path not in sys.path:
+        sys.path.insert(1, utility_path)
+
     # dump parsed and traversed graph at each test loading and running step
     graph.set_graph_logging_level(
         level=config["tests_params"].get_numeric("cartgraph_verbose_level", 20)
     )
 
-    # set default off and on state backends
-    from .states import btrfs, lvm, lxc, pool, qcow2, ramfile, vmnet
+    from .states.hooks import configure_env_process_hooks
 
-    ss.BACKENDS = {
-        "qcow2": qcow2.QCOW2Backend,
-        "qcow2ext": qcow2.QCOW2ExtBackend,
-        "lvm": lvm.LVMBackend,
-        "lxc": lxc.LXCBackend,
-        "btrfs": btrfs.BtrfsBackend,
-        "qcow2vt": qcow2.QCOW2VTBackend,
-        "ramfile": ramfile.RamfileBackend,
-        "vmnet": vmnet.VMNetBackend,
-    }
-    ramfile.RamfileBackend.image_state_backend = qcow2.QCOW2ExtBackend
-
-    # attach environment processing hooks
-    env_process_hooks()
+    configure_env_process_hooks(use_states)
 
 
 def full_vm_params_and_strs(
@@ -276,33 +302,3 @@ def full_tests_params_and_str(
         tests_str += "only %s\n" % default
     log.debug("Parsed tests string '%s'", tests_str)
     return tests_params, tests_str
-
-
-def env_process_hooks() -> None:
-    """
-    Add env processing hooks to handle needed customization steps.
-
-    These steps include on/off state get/set operations, vmnet networking,
-    and instance attachment to environment.
-    """
-
-    def on_state(fn: Callable[[Any], Any]) -> Any:
-        def wrapper(test: VirtTest, params: Params, env: Env) -> Any:
-            params["skip_types"] = "nets/vms/images nets"
-            fn(params, env)
-            del params["skip_types"]
-
-        return wrapper
-
-    def off_state(fn: Callable[[Any], Any]) -> Any:
-        def wrapper(test: VirtTest, params: Params, env: Env) -> Any:
-            params["skip_types"] = "nets/vms"
-            fn(params, env)
-            del params["skip_types"]
-
-        return wrapper
-
-    env_process.preprocess_vm_off_hook = off_state(ss.get_states)
-    env_process.preprocess_vm_on_hook = on_state(ss.get_states)
-    env_process.postprocess_vm_on_hook = on_state(ss.set_states)
-    env_process.postprocess_vm_off_hook = off_state(ss.set_states)

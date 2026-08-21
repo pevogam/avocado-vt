@@ -30,8 +30,6 @@ import logging
 from avocado.core.plugin_interfaces import Resolver
 from avocado.core.resolver import ReferenceResolution, ReferenceResolutionResult
 
-from virttest import cmd_parser
-from virttest import params_parser as param
 from virttest.cartgraph import TestGraph
 
 log = logging.getLogger("avocado.job." + __name__)
@@ -63,12 +61,27 @@ class TestLoader(Resolver):
         :param reference: tests reference used to produce tests
         :returns: test factories as tuples of the test class and its parameters
         """
-        if reference is not None:
-            assert reference.split() == self.config["params"]
-
         params, restriction = self.config["param_dict"], self.config["tests_str"]
-        return ReferenceResolution(
-            reference,
-            ReferenceResolutionResult.SUCCESS,
-            TestGraph.parse_flat_nodes(restriction, params),
+        multi_vm = self.config.get("run.vt_multi_vm") or self.config.get(
+            "list.vt_multi_vm"
         )
+        suite_runner = self.config.get("run.suite_runner", "nrunner")
+
+        if multi_vm and suite_runner != "traverser":
+            flat_net = TestGraph.parse_net_from_object_restrs(
+                "net1", self.config.get("vm_strs", {})
+            )
+            runnables = TestGraph().parse_composite_nodes(
+                restriction, flat_net, params=params
+            )
+        else:
+            runnables = TestGraph.parse_flat_nodes(restriction, params)
+        log.info(
+            "Resolved %d test nodes as runnable(s)",
+            len(runnables),
+        )
+
+        result = ReferenceResolutionResult.NOTFOUND
+        if runnables:
+            result = ReferenceResolutionResult.SUCCESS
+        return ReferenceResolution(reference, result, runnables)

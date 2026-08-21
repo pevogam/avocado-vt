@@ -43,19 +43,23 @@ rm -fr /mnt/local/images/shared/vm1-* /mnt/local/images/shared/vm2-*
 # minimal other dependencies for the integration run
 dnf install -y python3-coverage python3-lxc
 
-# minimal effect runs
+# serial multi-vm stateless and stateful-traversed runs (dry since no vms are available yet)
+echo
+echo "Perform serial multi-vm dry runs via fully avocado-integrated plugin entry points"
+avocado list --vt-multi-vm "only=tutorial3"
+avocado run --vt-multi-vm "only=tutorial3" --dry-run
+avocado run --vt-multi-vm --vt-states --suite-runner traverser \
+    "only=tutorial3 dry_run=yes"
+
+# minimal manual steps
 echo
 echo "Perform minimal effect steps (run minimal noop/list/run tools)"
-# fully avocado-integrated plugin entry points
-coverage run --append --source=virttest $(which avocado) list --auto "only=tutorial1"
-coverage run --append --source=virttest $(which avocado) run --auto "only=tutorial1 dry_run=yes"
-# minimal manual steps
 coverage run --append --source=virttest $(which avocado) manu setup=noop
 coverage run --append --source=virttest $(which avocado) manu setup=list
 
 # full integration run
 echo
-echo "Perform a full sample test suite run"
+echo "Perform a full multi-vm test suite run via autotest interface"
 avocado_cmd="coverage run --append --source=virttest $(which avocado) manu"
 test_slots="net1,net2,net3,net4,net5"
 $avocado_cmd setup=run nets=$test_slots only=leaves only_vm1=

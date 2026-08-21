@@ -81,8 +81,10 @@ class Manu(CLICmd):
 
         config["run.suite_runner"] = "traverser"
         config["params"] = config["vt.manu.params"]
+        config["params"].append("use_states=yes")
         try:
             cmd_parser.params_from_cmd(config)
+            cmd_parser.configure_runtime(config, use_states=True)
         except (ValueError, param.EmptyCartesianProduct) as error:
             LOG_UI.error(error)
             return 1

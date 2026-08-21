@@ -30,7 +30,7 @@ from typing import Any
 
 from virttest.utils_params import Params
 
-from ..vmnet import VMNetwork
+from ..vmnet import VMNetwork, setup_vmnet
 from .setup import StateBackend
 
 
@@ -55,14 +55,7 @@ class VMNetBackend(StateBackend):
 
         All arguments match the base class.
         """
-        env = object
-        env.start_ip_sniffing(params)
-        vmn = cls.network_class(params, env)
-
-        vmn.setup_host_bridges()
-        vmn.setup_host_services()
-        env.vmnet = vmn
-        type(env).get_vmnet = lambda self: self.vmnet
+        setup_vmnet(params, object, cls.network_class)
 
     @classmethod
     def set(cls, params: Params, object: Any = None) -> None:

@@ -120,6 +120,21 @@ class CmdParserTest(Test):
         self.assertIn("minimal", self.config["available_restrictions"])
         self.assertIn("only minimal\n", self.config["tests_str"])
 
+    def test_vt_reference_and_extra_params(self):
+        self.config["params"] = []
+
+        cmd.params_from_cmd(
+            self.config,
+            reference="only tutorial1",
+            extra_params=["vm_type=qemu", "mem=2048", "use_states=no"],
+        )
+
+        self.assertIn("only normal\n", self.config["tests_str"])
+        self.assertIn("only tutorial1\n", self.config["tests_str"])
+        self.assertEqual(self.config["param_dict"]["vm_type"], "qemu")
+        self.assertEqual(self.config["param_dict"]["mem"], "2048")
+        self.assertEqual(self.config["param_dict"]["use_states"], "no")
+
     def test_selected_tests_invalid(self):
         self.config["params"] += ["default_only=nonminimal"]
         with self.assertRaises(ValueError):
