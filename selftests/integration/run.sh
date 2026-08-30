@@ -79,16 +79,16 @@ avocado run --vt-multi-vm "only=tutorial3" --dry-run
 avocado run --vt-multi-vm --vt-states --suite-runner traverser \
     "only=tutorial3 dry_run=yes"
 
-# minimal manual steps
+# minimal environment steps
 echo
 echo -e "\033[35mPerform minimal effect steps (run minimal noop/list/run tools)\033[0m"
-coverage run --append --source=virttest $(which avocado) manu setup=noop
-coverage run --append --source=virttest $(which avocado) manu setup=list
+coverage run --append --source=virttest $(which avocado) env setup=noop
+coverage run --append --source=virttest $(which avocado) env setup=list
 
 # full integration run
 echo
 echo -e "\033[35mPerform a full multi-vm test suite run via autotest interface\033[0m"
-avocado_cmd="coverage run --append --source=virttest $(which avocado) manu"
+avocado_cmd="coverage run --append --source=virttest $(which avocado) env"
 test_slots="net1,net2,net3,net4,net5"
 $avocado_cmd setup=run nets=$test_slots only=leaves only_vm1=
 
@@ -148,7 +148,7 @@ ls -A1q "$test_results/latest/test-results" | grep -q install && (echo "Unwanted
 ls -A1q "$test_results/latest/test-results" | grep -q tutorial1 || (echo "The tutorial1 test wasn't run serially" && exit 1)
 
 echo
-echo "Test coverage for manual tools of all main types"
+echo "Test coverage for environment tools of all main types"
 $avocado_cmd setup=control nets=$test_slots vms=vm1,vm2 control_file=manual.control
 container_array=($containers)
 test $(ls -A1q "$test_results/latest/test-results" | grep -v by-status | wc -l) == $((${#container_array[@]}-1)) || (echo "Incorrect total of control file runs" && exit 1)

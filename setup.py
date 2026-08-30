@@ -114,7 +114,7 @@ if __name__ == "__main__":
                 "vt-bootstrap = avocado_vt.plugins.vt_bootstrap:VTBootstrap",
                 "vt-list-guests = avocado_vt.plugins.vt_list_guests:VTListGuests",
                 "vt-list-archs = avocado_vt.plugins.vt_list_archs:VTListArchs",
-                "manu = avocado_vt.plugins.manu:Manu",
+                "env = avocado_vt.plugins.env:Environment",
             ],
             "avocado.plugins.result_events": [
                 "vt-joblock = avocado_vt.plugins.vt_joblock:VTJobLock",

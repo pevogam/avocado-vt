@@ -26,6 +26,11 @@ class CmdParserTest(Test):
         with self.assertRaises(ValueError):
             cmd.params_from_cmd(self.config)
 
+    def test_setup_chain(self):
+        self.config["params"] = ["setup=get,set"]
+        cmd.params_from_cmd(self.config)
+        self.assertEqual(self.config["vms_params"].objects("setup"), ["get", "set"])
+
     def test_selected_vms_default(self):
         """Test default (from config) vm selection."""
         cmd.params_from_cmd(self.config)

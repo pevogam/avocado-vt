@@ -13,10 +13,11 @@
 # Author: Plamen Dimitrov <plamen.dimitrov@intra2net.com>
 
 """
-Manu plugin as a separate avocado command.
+Environment tools as a separate avocado command.
 
 SUMMARY
 ------------------------------------------------------
+Allows dynamical loading of tools and chaining of these for one-line scripting.
 
 Copyright: Intra2net AG
 
@@ -40,24 +41,24 @@ from virttest import params_parser as param
 from virttest.utils_params import Params
 
 
-class Manu(CLICmd):
-    """Class for the manu plugin."""
+class Environment(CLICmd):
+    """Run VT environment tools and setup chains."""
 
-    name = "manu"
+    name = "env"
     description = (
-        "Tools using setup chains of manual steps with Cartesian graph manipulation."
+        "Tools using environment setup chains with Cartesian graph manipulation."
     )
 
     def configure(self, parser: argparse.ArgumentParser) -> None:
         """
-        Add the parser for the manual action.
+        Add the parser for the environment action.
 
         :param parser: Main test runner parser.
         """
-        parser = super(Manu, self).configure(parser)
+        parser = super(Environment, self).configure(parser)
 
         settings.register_option(
-            section="vt.manu",
+            section="vt.env",
             key="params",
             key_type=list,
             default=[],
@@ -70,17 +71,17 @@ class Manu(CLICmd):
 
     def run(self, config: Params) -> int:
         """
-        Run the manu plugin.
+        Run the environment tools plugin.
 
         Take care of command line overwriting, parameter preparation for all host controls,
         setup and cleanup chains, and paths/utilities for all host controls.
         """
-        log.info("Manual setup chain started.")
+        log.info("Environment setup chain started.")
         # set English environment (command output might be localized, need to be safe)
         os.environ["LANG"] = "en_US.UTF-8"
 
         config["run.suite_runner"] = "traverser"
-        config["params"] = config["vt.manu.params"]
+        config["params"] = config["vt.env.params"]
         config["params"].append("use_states=yes")
         try:
             cmd_parser.params_from_cmd(config)
@@ -111,5 +112,5 @@ class Manu(CLICmd):
                 LOG_UI.error("Use 'export AVOCADO_LOG_EARLY=1' for further details.")
                 retcode = 1
 
-        log.info("Manual setup chain finished.")
+        log.info("Environment setup chain finished.")
         return retcode
