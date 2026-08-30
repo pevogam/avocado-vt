@@ -43,9 +43,35 @@ rm -fr /mnt/local/images/shared/vm1-* /mnt/local/images/shared/vm2-*
 # minimal other dependencies for the integration run
 dnf install -y python3-coverage python3-lxc
 
+# most standard integration run
+echo
+echo -e "\033[35mPerform most standard VT integration run first\033[0m"
+avocado vt-bootstrap --vt-type=qemu --yes-to-all
+iptables -I INPUT -i virbr0 -p udp --dport 67 -j ACCEPT
+iptables -I INPUT -i virbr0 -p udp --dport 53 -j ACCEPT
+iptables -I INPUT -i virbr0 -p tcp --dport 53 -j ACCEPT
+avocado list --vt-type=qemu "only boot"
+avocado run \
+    --vt-type qemu "only boot" --status-server-disable-auto
+
+# LXC isolated parallel run
+echo
+echo -e "\033[35mPerform LXC-isolated parallel VT integration run\033[0m"
+for cid in c101 c102; do
+    lxc-start $cid
+    lxc-attach $cid -- avocado vt-bootstrap --vt-type=qemu --yes-to-all
+    lxc-attach $cid -- iptables -I INPUT -i virbr0 -p udp --dport 67 -j ACCEPT
+    lxc-attach $cid -- iptables -I INPUT -i virbr0 -p udp --dport 53 -j ACCEPT
+    lxc-attach $cid -- iptables -I INPUT -i virbr0 -p tcp --dport 53 -j ACCEPT
+done
+avocado list --vt-type=qemu "only boot,reboot"
+avocado run \
+    --spawner lxc --max-parallel-tasks 2 \
+    --vt-type qemu "only boot" "only reboot" --status-server-disable-auto
+
 # serial multi-vm stateless and stateful-traversed runs (dry since no vms are available yet)
 echo
-echo "Perform serial multi-vm dry runs via fully avocado-integrated plugin entry points"
+echo -e "\033[35mPerform serial multi-vm dry runs via fully avocado-integrated plugin entry points\033[0m"
 avocado list --vt-multi-vm "only=tutorial3"
 avocado run --vt-multi-vm "only=tutorial3" --dry-run
 avocado run --vt-multi-vm --vt-states --suite-runner traverser \
@@ -53,13 +79,13 @@ avocado run --vt-multi-vm --vt-states --suite-runner traverser \
 
 # minimal manual steps
 echo
-echo "Perform minimal effect steps (run minimal noop/list/run tools)"
+echo -e "\033[35mPerform minimal effect steps (run minimal noop/list/run tools)\033[0m"
 coverage run --append --source=virttest $(which avocado) manu setup=noop
 coverage run --append --source=virttest $(which avocado) manu setup=list
 
 # full integration run
 echo
-echo "Perform a full multi-vm test suite run via autotest interface"
+echo -e "\033[35mPerform a full multi-vm test suite run via autotest interface\033[0m"
 avocado_cmd="coverage run --append --source=virttest $(which avocado) manu"
 test_slots="net1,net2,net3,net4,net5"
 $avocado_cmd setup=run nets=$test_slots only=leaves only_vm1=
@@ -136,4 +162,4 @@ test $(ls -A1q "$test_results/latest/test-results" | grep customize | wc -l) == 
 test $(ls -A1q "$test_results/latest/test-results" | grep connect.vms.vm1 | wc -l) == 1 || (echo "Incorrect number of connect tests during update" && exit 1)
 
 echo
-echo "Integration tests passed successfully"
+echo -e "\033[35mIntegration tests passed successfully\033[0m"
