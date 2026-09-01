@@ -45,5 +45,43 @@ class TestVMXMLDelSeclabel(Test):
         self.assertEqual(2, len(seclabels))
 
 
+IOMMUFD_XML = "<iommufd enabled='yes' fdgroup='iommu'/>"
+
+iommufd_attrs = {
+    "iommufd_attr": {"enabled": "yes", "fdgroup": "iommu"},
+}
+
+
+class TestVMXMLIommufd(Test):
+    def test_setup_iommufd(self):
+        iommufd = vm_xml.IOMMUFDXML()
+        iommufd.setup_attrs(**iommufd_attrs)
+
+        cmp_xml = vm_xml.IOMMUFDXML()
+        cmp_xml.xml = IOMMUFD_XML
+        self.assertEqual(iommufd, cmp_xml)
+        self.assertNotIn("<attrs", str(iommufd))
+
+    def test_fetch_attrs_iommufd(self):
+        iommufd = vm_xml.IOMMUFDXML()
+        iommufd.xml = IOMMUFD_XML
+        self.assertEqual(iommufd_attrs, iommufd.fetch_attrs())
+
+    def test_vmxml_iommufd_element(self):
+        vmxml = vm_xml.VMXML()
+        vmxml.xml = "<domain type='kvm'><name>test</name></domain>"
+        iommufd = vm_xml.IOMMUFDXML()
+        iommufd.setup_attrs(**iommufd_attrs)
+        vmxml.iommufd = iommufd
+
+        self.assertEqual(iommufd_attrs["iommufd_attr"], vmxml.iommufd.iommufd_attr)
+        self.assertIn("<iommufd", str(vmxml))
+        self.assertNotIn("<attrs", str(vmxml))
+
+        del vmxml.iommufd
+        with self.assertRaises(xcepts.LibvirtXMLError):
+            _ = vmxml.iommufd
+
+
 if __name__ == "__main__":
     unittest.main()
