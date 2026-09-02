@@ -110,6 +110,9 @@ class MultiVM(CLI):
                 f"use_states={'yes' if use_states else 'no'}",
             )
         )
+        if use_states:
+            config["vt.common.tmp_dir"] = "/tmp"
+            extra_params.extend(("keep_vms_after_test=yes", "job_env_cleanup=no"))
         cmd_parser.params_from_cmd(
             config,
             reference=reference,

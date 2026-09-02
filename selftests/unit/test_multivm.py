@@ -159,8 +159,14 @@ class MultiVMResolverRoutingTest(unittest.TestCase):
         params_from_cmd.assert_called_once_with(
             config,
             reference="only tutorial2",
-            extra_params=["vm_type=qemu", "use_states=yes"],
+            extra_params=[
+                "vm_type=qemu",
+                "use_states=yes",
+                "keep_vms_after_test=yes",
+                "job_env_cleanup=no",
+            ],
         )
+        self.assertEqual(config["vt.common.tmp_dir"], "/tmp")
         configure_runtime.assert_called_once_with(config, use_states=True)
 
 

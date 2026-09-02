@@ -81,8 +81,18 @@ class Environment(CLICmd):
         os.environ["LANG"] = "en_US.UTF-8"
 
         config["run.suite_runner"] = "traverser"
+        config["vt.common.tmp_dir"] = "/tmp"
+        # Environment subtools also execute VT operations in this process, so
+        # keep its global settings synchronized with the forwarded job config.
+        settings.update_option("vt.common.tmp_dir", "/tmp")
         config["params"] = config["vt.env.params"]
-        config["params"].append("use_states=yes")
+        config["params"].extend(
+            (
+                "use_states=yes",
+                "keep_vms_after_test=yes",
+                "job_env_cleanup=no",
+            )
+        )
         try:
             cmd_parser.params_from_cmd(config)
             cmd_parser.configure_runtime(config, use_states=True)

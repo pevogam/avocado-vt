@@ -268,6 +268,7 @@ class VirtTest(test.Test, utils.TestUtils):
 
         # Open the environment file
         env_filename = os.path.join(data_dir.get_tmp_dir(), params.get("env", "env"))
+        self.log.debug("Using environment file %s", env_filename)
         env = utils_env.Env(env_filename, self.env_version)
         if params.get_boolean("job_env_cleanup", "yes"):
             self.runner_queue.put(
