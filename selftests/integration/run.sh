@@ -31,11 +31,13 @@ slots = ['c101', 'c102', 'c103', 'c104', 'c105']
 slots = ['c101', 'c102', 'c103', 'c104', 'c105']
 EOF
 mkdir -p /etc/avocado/conf.d
-# TODO: use VT's approach to register the plugin config
-if [ ! -f /etc/avocado/conf.d/vt.conf ]; then
+# TODO: we could skip symlinks if "pip install -e" above is provided
+# in which case VT will install its local config and we only need to
+# add "[vt.common]\nsuite_path = ${test_suite}" to an avocado config
+if [ ! -e "$vt_config" ] && [ ! -L "$vt_config" ]; then
     ln -s ~/avocado-vt-libs/avocado_vt/conf.d/vt.conf "${vt_config}"
 fi
-sed -i "s#suite_path = .*#suite_path = ${test_suite}#" "${vt_config}"
+sed --follow-symlinks -i "s#suite_path = .*#suite_path = ${test_suite}#" "${vt_config}"
 rm ${HOME}/avocado_overwrite_* -fr
 rm -fr /mnt/local/images/swarm/*
 rm -fr /mnt/local/images/shared/vm1-* /mnt/local/images/shared/vm2-*
