@@ -1183,9 +1183,12 @@ class UnattendedInstallConfig(object):
                 self.syslog_server_ip, self.syslog_server_port, self.syslog_server_tcp
             )
 
+        preseed_in_initrd = False
         if self.medium in ["cdrom", "kernel_initrd"]:
             if self.kernel and self.initrd:
                 self.setup_cdrom()
+                # CD setup embeds preseed files in the extracted initrd.
+                preseed_in_initrd = self.unattended_file.endswith(".preseed")
         elif self.medium == "url":
             self.setup_url()
         elif self.medium == "nfs":
@@ -1205,7 +1208,10 @@ class UnattendedInstallConfig(object):
                     src_dir = self.floppy or self.cdrom_unattended
                     dst_dir = self.results_dir
                     shutil.copy(src_dir, dst_dir)
-            else:
+            elif not (
+                preseed_in_initrd
+                and self.params.get("unattended_delivery_method") == "integrated"
+            ):
                 self.setup_unattended_http_server()
 
         # Update params dictionary as some of the values could be updated
