@@ -22,6 +22,7 @@ INTERFACE
 
 import logging
 import re
+import shlex
 
 # avocado imports
 from avocado.core import exceptions
@@ -194,16 +195,28 @@ def configure_unattended_preseed(params):
     vm_params = params.object_params(params["main_vm"])
     vm_nics = vm_params.objects("nics")
 
-    for i, nic in reversed(list(enumerate(vm_nics))):
-        network_line = "network --device eth%i" % i
-        if nic != params["internet_nic"]:
-            ps_string = ps_string.replace("#NETIP#", vm_params.object_params(nic)["ip"])
-            ps_string = ps_string.replace(
-                "#NETMASK#", vm_params.object_params(nic)["netmask"]
+    # netcfg handles DHCP on the internet NIC; late_command adds static NICs.
+    network_commands = []
+    for nic in vm_nics:
+        nic_params = vm_params.object_params(nic)
+        if nic == vm_params["internet_nic"]:
+            ps_string = ps_string.replace("#NETDEVICE#", nic_params["mac"])
+        else:
+            mac, ip, netmask = (
+                shlex.quote(nic_params[key]) for key in ("mac", "ip", "netmask")
             )
-            ps_string = ps_string.replace(
-                "#GATEWAY#", vm_params.object_params(nic)["ip_provider"]
+            # Resolve by MAC, as in kickstart, without assuming ethN names.
+            network_commands.append(
+                f"interface=$(grep -ilx {mac} /sys/class/net/*/address) && "
+                "interface=${interface%/address} && interface=${interface##*/} && "
+                "printf '\\nauto %s\\niface %s inet static\\n"
+                "    address %s\\n    netmask %s\\n' "
+                f'"$interface" "$interface" {ip} {netmask} >> /etc/network/interfaces'
             )
+    # Update netcfg's source file too: finish-install can copy it over the target.
+    ps_string = ps_string.replace(
+        "#NETCONFIG#", " && ".join(network_commands) or "true"
+    )
 
     ps_string = ps_string.replace("#VMNAME#", params["main_vm"])
     ps_string = ps_string.replace("#ROOTPW#", params["password"])

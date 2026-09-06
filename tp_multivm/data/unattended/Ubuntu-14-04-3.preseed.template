@@ -5,16 +5,12 @@ d-i debian-installer/locale string en_US
 d-i console-tools/archs select at
 d-i console-keymaps-at/keymap select us
 
-# static network configuration for the first interface
-d-i netcfg/choose_interface select eth0
-d-i netcfg/disable_dhcp boolean true
-d-i netcfg/get_ipaddress string #NETIP#
-d-i netcfg/get_netmask string #NETMASK#
-d-i netcfg/get_gateway string #GATEWAY#
-d-i netcfg/get_nameservers string #GATEWAY#
-d-i netcfg/confirm_static boolean true
+# DHCP on the internet interface during installation
+d-i netcfg/choose_interface select #NETDEVICE#
+d-i netcfg/disable_dhcp boolean false
+d-i netcfg/disable_autoconfig boolean false
+d-i netcfg/target_network_config select ifupdown
 
-d-i netcfg/choose_interface select auto
 d-i netcfg/get_hostname string #VMNAME#
 d-i netcfg/get_domain string virt-tests
 d-i netcfg/wireless_wep string
@@ -61,6 +57,8 @@ ubiquity ubiquity/reboot boolean true
 d-i finish-install/reboot_in_progress note
 d-i debian-installer/exit/poweroff boolean true
 d-i preseed/late_command string \
+#NETCONFIG# || exit 1; \
+cp /etc/network/interfaces /target/etc/network/interfaces || exit 1; \
 echo "start on stopped rc or RUNLEVEL=[2345]" > /target/etc/init/ttyS0.conf; \
 echo "stop on runlevel [!2345]" >> /target/etc/init/ttyS0.conf; \
 sed -i 's/PermitRootLogin without-password/PermitRootLogin yes/g' /target/etc/ssh/sshd_config; \
