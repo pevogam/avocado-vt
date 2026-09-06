@@ -72,9 +72,12 @@ def permubuntu(config, tag=""):
             )
         )
 
+    print(graph.workers.values())
     for test_worker in graph.workers.values():
         test_worker.net.update_restrs(config["vm_strs"])
+        print(test_worker)
         for test_object in [o for o in graph.objects if o.key == "vms"]:
+            print(test_object)
             setup_dict = config["param_dict"].copy()
             setup_dict["vms"] = test_object.suffix
             setup_dict.update({"set_state_vms": "ready"})
@@ -99,5 +102,6 @@ def permubuntu(config, tag=""):
                 node.params["object_suffix"] = test_object.long_suffix
 
     graph.parse_shared_root_from_object_roots(config["param_dict"])
+    print(graph)
     r.run_workers(graph, config["param_dict"])
     LOG_UI.info("Finished permanent vm setup")
