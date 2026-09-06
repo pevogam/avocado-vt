@@ -3304,7 +3304,13 @@ class DbNet(VMNet):
             raise DbNoLockError
 
 
-ADDRESS_POOL_FILENAME = os.path.join(data_dir.get_tmp_dir(), "address_pool")
+def get_address_pool_filename():
+    """Return the address pool in the current VT temporary directory."""
+    return os.path.join(data_dir.get_tmp_dir(), "address_pool")
+
+
+# Retain the historical module attributes for callers that import them.
+ADDRESS_POOL_FILENAME = get_address_pool_filename()
 ADDRESS_POOL_LOCK_FILENAME = ADDRESS_POOL_FILENAME + ".lock"
 
 
@@ -3312,10 +3318,12 @@ def clean_tmp_files():
     """
     Remove the base address pool filename.
     """
-    if os.path.isfile(ADDRESS_POOL_LOCK_FILENAME):
-        os.unlink(ADDRESS_POOL_LOCK_FILENAME)
-    if os.path.isfile(ADDRESS_POOL_FILENAME):
-        os.unlink(ADDRESS_POOL_FILENAME)
+    address_pool_filename = get_address_pool_filename()
+    address_pool_lock_filename = address_pool_filename + ".lock"
+    if os.path.isfile(address_pool_lock_filename):
+        os.unlink(address_pool_lock_filename)
+    if os.path.isfile(address_pool_filename):
+        os.unlink(address_pool_filename)
 
 
 class VirtNet(DbNet, ParamsNet):
@@ -3327,7 +3335,7 @@ class VirtNet(DbNet, ParamsNet):
     # assuming there is existing properties/data on the instance
     # and take steps to preserve or update it as appropriate.
 
-    def __init__(self, params, vm_name, db_key, db_filename=ADDRESS_POOL_FILENAME):
+    def __init__(self, params, vm_name, db_key, db_filename=None):
         """
         Load networking info. from db, then from params, then update db.
 
@@ -3336,6 +3344,8 @@ class VirtNet(DbNet, ParamsNet):
         :param db_key: database key uniquely identifying VM instance
         :param db_filename: database file to cache previously parsed params
         """
+        if db_filename is None:
+            db_filename = get_address_pool_filename()
         # Params always overrides database content
         DbNet.__init__(self, params, vm_name, db_filename, db_key)
         ParamsNet.__init__(self, params, vm_name)

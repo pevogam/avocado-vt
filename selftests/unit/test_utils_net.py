@@ -274,6 +274,32 @@ class TestVmNet(Test):
     def test_string_container(self):
         self.assertRaises(TypeError, utils_net.VMNet, str, ["Foo"])
 
+    def test_address_pool_uses_current_tmp_dir(self):
+        original_get_tmp_dir = utils_net.data_dir.get_tmp_dir
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            try:
+                utils_net.data_dir.get_tmp_dir = lambda: tmp_dir
+                virtnet = utils_net.VirtNet(
+                    utils_params.Params({"vms": "vm1", "nics": "nic1"}),
+                    "vm1",
+                    "vm1",
+                )
+                self.assertEqual(
+                    virtnet.db_filename, os.path.join(tmp_dir, "address_pool")
+                )
+                self.assertEqual(
+                    utils_net.get_address_pool_filename(),
+                    os.path.join(tmp_dir, "address_pool"),
+                )
+                lock_filename = virtnet.db_filename + ".lock"
+                with open(lock_filename, "w"):
+                    pass
+                utils_net.clean_tmp_files()
+                self.assertFalse(os.path.exists(virtnet.db_filename))
+                self.assertFalse(os.path.exists(lock_filename))
+            finally:
+                utils_net.data_dir.get_tmp_dir = original_get_tmp_dir
+
     def test_VirtIface_container(self):
         test_data = [
             {"nic_name": "nic1", "mac": "0a"},
