@@ -96,7 +96,19 @@ def get_cartesian_parser_details(cartesian_parser):
     details = ""
     details += "Tests produced by config file %s\n\n" % cartesian_parser.filename
 
+    details += "CartConf version: "
+    is_varianter = not hasattr(cartesian_parser, "only_filters")
+    if is_varianter:
+        details += "external varianter (dependency)"
+    else:
+        details += "native VT module (blob)"
+    details += "\n\n"
+
     details += "The full test list was modified by the following:\n\n"
+
+    if is_varianter:
+        details += cartesian_parser.node.dump(0, recurse=True)
+        return details
 
     if cartesian_parser.only_filters:
         details += "Filters applied:\n"
