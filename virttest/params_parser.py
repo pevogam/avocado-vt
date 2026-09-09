@@ -33,7 +33,7 @@ import os
 
 from avocado.core.settings import settings
 
-from virttest.cartconf import Parser
+from virttest.cartconf import Parser, copy_parser
 from virttest.cartesian_config import print_dicts
 from virttest.utils_params import Params
 
@@ -406,9 +406,7 @@ class Reparsable:
 
         # start with most-steps cached parser if any or create new one
         if parser is not None:
-            # TODO: need resettable parser or AST or PreDict to not have to copy
-            # TODO: shallow copy is too shallow, deepcopy cannot pickle due to rust nodes
-            parser = copy.copy(parser)
+            parser = copy_parser(parser)
         else:
             parser = Parser()
             # Parse the base settings only once (if starting fresh)
@@ -433,8 +431,7 @@ class Reparsable:
                 parser.parse_string(step.parsable_form())
 
             # Cache the parser after each step
-            # TODO: shallow copy is too shallow, deepcopy cannot pickle due to rust nodes
-            self._cache_parser(self.steps[: i + 1], copy.copy(parser))
+            self._cache_parser(self.steps[: i + 1], copy_parser(parser))
 
         # log any required information and detect empty Cartesian product
         if show_restriction:

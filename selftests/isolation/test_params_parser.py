@@ -7,6 +7,7 @@ from avocado import Test
 
 import virttest.params_parser as param
 from virttest.cartconf import Parser
+from virttest.cartesian_config import Parser as PythonParser
 
 
 class ParamsParserTest(Test):
@@ -273,6 +274,32 @@ class ParamsParserTest(Test):
         self.assertNotIn("key2", dict1)
         self.assertIn("key2", dict4)
         self.assertEqual(dict4["key2"], "value2")
+
+    def test_cached_parser_isolation(self):
+        """Cached siblings and returned parsers remain independent on both backends."""
+        for backend in (Parser, PythonParser):
+            with self.subTest(backend=backend.__module__), mock.patch.object(
+                param, "Parser", backend
+            ), mock.patch.dict(param.Reparsable._parse_cache, clear=True):
+                base = "variants:\n    - a:\n    - b:\n"
+                left = param.Reparsable()
+                left.parse_next_batch(base_str=base, base_dict={"left": "1"})
+                first = left.get_parser()
+                expected = list(first.get_dicts())
+
+                right = param.Reparsable()
+                right.parse_next_batch(base_str=base, base_dict={"right": "2"})
+                sibling = right.get_parser()
+                self.assertTrue(all("left" not in d for d in sibling.get_dicts()))
+                self.assertEqual(list(first.get_dicts()), expected)
+
+                cached = left.get_parser()
+                if hasattr(first, "ast"):
+                    self.assertIs(first.ast, cached.ast)
+                first.parse_string("only a\n")
+                self.assertEqual(len(list(first.get_dicts())), 1)
+                self.assertEqual(list(cached.get_dicts()), expected)
+                self.assertEqual(list(left.get_parser().get_dicts()), expected)
 
     def test_parser_params(self):
         """Test that parameters obtain from parser or directly are the same."""
