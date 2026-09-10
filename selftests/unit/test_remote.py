@@ -2,6 +2,7 @@
 
 import os
 import sys
+import tempfile
 import unittest
 
 # simple magic for using scripts within a source tree
@@ -15,13 +16,16 @@ from virttest import data_dir, remote
 
 
 class RemoteFileTest(Test):
-    tmp_dir = data_dir.get_tmp_dir()
-    test_file_path = os.path.join(tmp_dir, "remote_file")
     default_data = ["RemoteFile Test.\n", "Pattern Line."]
 
-    def __del__(self):
-        if os.path.exists(self.test_file_path):
-            os.remove(self.test_file_path)
+    def setUp(self):
+        self.tmp_dir = tempfile.TemporaryDirectory(
+            prefix="remote-file-", dir=data_dir.get_tmp_dir()
+        )
+        self.test_file_path = os.path.join(self.tmp_dir.name, "remote_file")
+
+    def tearDown(self):
+        self.tmp_dir.cleanup()
 
     def _new_remote_file(self):
         if os.path.exists(self.test_file_path):
