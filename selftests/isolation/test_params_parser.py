@@ -296,6 +296,7 @@ class ParamsParserTest(Test):
         self.assertEqual(list(child.get_dicts()), expected)
 
         cached = left.get_parser()
+        self.assertIs(child.ast, cached.ast)
         child.parse_string("only a\n")
         self.assertEqual(len(list(child.get_dicts())), 1)
         # cached dictionaries are same despite extended child
