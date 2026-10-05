@@ -502,14 +502,18 @@ class Reparsable:
             show_dictionaries=show_dictionaries,
             show_dict_fullname=show_dict_fullname,
             show_dict_contents=show_dict_contents,
-            show_empty_cartesian_product=True,
+            show_empty_cartesian_product=show_dictionaries,
         )
 
+        # Check for an empty product while retrieving the requested dictionary.
+        i = -1
         for i, d in enumerate(parser.get_dicts()):
             if i == dict_index:
                 default_params = d
                 break
         else:
+            if i == -1:
+                raise EmptyCartesianProduct(str(self)) from None
             raise ValueError(
                 f"There must be a configuration for the restriction:\n{self}"
             )

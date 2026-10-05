@@ -388,6 +388,51 @@ class ParamsParserTest(Test):
         with self.assertRaises(ValueError):
             config.get_params(dict_index=2)
 
+    def test_params_single_traversal(self):
+        """Selecting parameters checks existence without a second traversal."""
+        config = param.Reparsable()
+        config.parse_next_str(
+            "variants:\n    - a:\n        value = one\n"
+            "    - b:\n        value = two\n"
+        )
+        with mock.patch.object(
+            Parser, "get_dicts", autospec=True, side_effect=Parser.get_dicts
+        ) as get_dicts:
+            params = config.get_params(list_of_keys=["value"], dict_index=1)
+        self.assertEqual(params, {"value": "two"})
+        # The legacy parser also calls get_dicts recursively with a node argument.
+        root_calls = [call for call in get_dicts.call_args_list if len(call.args) == 1]
+        self.assertEqual(len(root_calls), 1)
+
+    def test_params_empty_product(self):
+        """An empty product keeps its distinct error for any dictionary index."""
+        config = param.Reparsable()
+        config.parse_next_str("variants:\n    - a:\nonly missing\n")
+        for show_dictionaries in (False, True):
+            for dict_index in (0, 1, -1):
+                with self.subTest(
+                    show_dictionaries=show_dictionaries, dict_index=dict_index
+                ):
+                    with self.assertRaises(param.EmptyCartesianProduct) as error:
+                        config.get_params(
+                            dict_index=dict_index, show_dictionaries=show_dictionaries
+                        )
+                    self.assertIn(str(config), str(error.exception))
+
+    def test_params_show_dictionaries(self):
+        """Printing all variants preserves the requested parameter selection."""
+        config = param.Reparsable()
+        config.parse_next_str("variants:\n    - a:\n    - b:\n")
+        printed = []
+        with mock.patch.object(
+            param,
+            "print_dicts",
+            side_effect=lambda options, dicts: printed.extend(dicts),
+        ):
+            params = config.get_params(dict_index=1, show_dictionaries=True)
+        self.assertEqual([d["name"] for d in printed], ["a", "b"])
+        self.assertEqual(params, printed[1])
+
 
 if __name__ == "__main__":
     unittest.main()
