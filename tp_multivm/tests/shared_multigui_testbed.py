@@ -18,7 +18,7 @@ with a stored online state with the name of "vu_alt".
 Once you have prepared or obtained such images, you can both get the
 "vu_alt" state and run the test with::
 
-    sh run.sh setup=develop mode=testbed vms=vm4,vm5
+    avocado env setup=develop devmode=testbed vms=vm4,vm5
 
 Then experiment on a canvas (paint->mouse) or blank space (editor->keys).
 
@@ -30,11 +30,12 @@ INTERFACE
 
 import logging
 import random
-import sys
 
 # custom imports
-from multi_gui_utils import GUITestGenerator, Linux, Windows
-from PyQt4 import QtCore, QtGui
+from multi_gui_utils import Linux, Windows
+from PyQt5 import QtCore, QtWidgets
+from test_generator.generator_api import API
+from test_generator.generator_app import GUITestGenerator
 
 log = logging.getLogger("avocado.test.log")
 
@@ -48,42 +49,20 @@ def stress_test(gui, name, *args):
     """
     Run a stress test of a given class by calling this function.
 
-    :param gui: the GUI control window
-    :type gui: GUITestGenerator object
+    :param gui: the generator API
+    :type gui: test_generator.generator_api.API
     :param str name: test class :"mouse-grid", "mouse-hit", "all-keys", or "custom"
     :param args: test arguments
     """
-    gui.interrupted = False
-
-    def interrupt():
-        gui.interrupted = True
-        gui.button_run.setText("Stopping")
-        log.info("Interrupting current stress test run")
-
-    def interrupted():
-        gui.button_run.setText("Run")
-        gui.disconnect(gui.button_run, QtCore.SIGNAL("clicked()"), interrupt)
-        gui.connect(gui.button_run, QtCore.SIGNAL("clicked()"), gui.run)
-        if gui.interrupted:
-            log.info("Current stress test interrupted")
-            gui.interrupted = False
-        else:
-            log.info("Current stress test completed")
-
-    gui.button_run.setText("Stop")
-    gui.disconnect(gui.button_run, QtCore.SIGNAL("clicked()"), gui.run)
-    gui.connect(gui.button_run, QtCore.SIGNAL("clicked()"), interrupt)
-
-    if name == "mouse-grid":
-        gui.worker = StressTestMouseGrid(gui, *args)
-    elif name == "mouse-hit":
-        gui.worker = StressTestMouseHit(gui, *args)
-    elif name == "all-keys":
-        gui.worker = StressTestAllKeys(gui, *args)
-    elif name == "custom":
-        gui.worker = StressTestCustom(gui, *args)
-    gui.worker.finished.connect(interrupted)
-    gui.worker.start()
+    tests = {
+        "mouse-grid": StressTestMouseGrid,
+        "mouse-hit": StressTestMouseHit,
+        "all-keys": StressTestAllKeys,
+        "custom": StressTestCustom,
+    }
+    # The generator already runs control code in a worker. Keep this call in
+    # that worker so its Stop button and error reporting cover stress tests too.
+    tests[name](gui, *args).run()
 
 
 class StressTestMouseGrid(QtCore.QThread):
@@ -101,7 +80,7 @@ class StressTestMouseGrid(QtCore.QThread):
         Construct the stress test.
 
         :param gui: the GUI control window
-        :type gui: GUITestGenerator object
+        :type gui: test_generator.generator_api.API
         :param int step: grid interval
         """
         QtCore.QThread.__init__(self)
@@ -110,15 +89,14 @@ class StressTestMouseGrid(QtCore.QThread):
 
     def run(self):
         """Run the stress test."""
-        from guibot.guibot.location import Location
+        from guibot.location import Location
 
-        l = Location(0, 0)
-        for i in range(0, 500 / self.step):
-            l.xpos = 100 + self.step * i
-            for j in range(0, 500 / self.step):
-                l.ypos = 100 + self.step * j
-                self.gui.user.click(l)
-                if self.gui.interrupted:
+        for i in range(0, 500 // self.step):
+            for j in range(0, 500 // self.step):
+                self.gui._visual_object.click(
+                    Location(100 + self.step * i, 100 + self.step * j)
+                )
+                if self.gui.interrupt_requested:
                     return
 
 
@@ -139,7 +117,7 @@ class StressTestMouseHit(QtCore.QThread):
         Construct the stress test.
 
         :param gui: the GUI control window
-        :type gui: GUITestGenerator object
+        :type gui: test_generator.generator_api.API
         :param int trials: number of trials to hit target
         """
         QtCore.QThread.__init__(self)
@@ -148,18 +126,15 @@ class StressTestMouseHit(QtCore.QThread):
 
     def run(self):
         """Run the stress test."""
-        from guibot.guibot.location import Location
+        from guibot.location import Location
 
-        l = Location(100, 100)
         for i in range(self.trials):
             log.info(f"Performing hover-click hit {i}")
-            l.xpos = random.randrange(100, 500)
-            l.ypos = random.randrange(100, 500)
-            self.gui.user.hover(l)
-            l.xpos = 300
-            l.ypos = 300
-            self.gui.user.click(l)
-            if self.gui.interrupted:
+            self.gui._visual_object.hover(
+                Location(random.randrange(100, 500), random.randrange(100, 500))
+            )
+            self.gui._visual_object.click(Location(300, 300))
+            if self.gui.interrupt_requested:
                 return
 
 
@@ -178,23 +153,25 @@ class StressTestAllKeys(QtCore.QThread):
         Construct the stress test.
 
         :param gui: the GUI control window
-        :type gui: GUITestGenerator object
+        :type gui: test_generator.generator_api.API
         """
         QtCore.QThread.__init__(self)
         self.gui = gui
 
     def run(self):
         """Run the stress test."""
-        self.gui.user.type_text("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-        self.gui.user.press_keys([self.gui.user.ENTER])
-        if self.gui.interrupted:
+        self.gui._visual_object.type_text(
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        )
+        self.gui._visual_object.press_keys([self.gui._visual_object.ENTER])
+        if self.gui.interrupt_requested:
             return
-        self.gui.user.type_text("`1234567890-=~!@#$%^&*()_+")
-        self.gui.user.press_keys([self.gui.user.ENTER])
-        if self.gui.interrupted:
+        self.gui._visual_object.type_text("`1234567890-=~!@#$%^&*()_+")
+        self.gui._visual_object.press_keys([self.gui._visual_object.ENTER])
+        if self.gui.interrupt_requested:
             return
-        self.gui.user.type_text("[]{};'\\:\"|,./<>?")
-        self.gui.user.press_keys([self.gui.user.ENTER])
+        self.gui._visual_object.type_text("[]{};'\\:\"|,./<>?")
+        self.gui._visual_object.press_keys([self.gui._visual_object.ENTER])
 
 
 class StressTestCustom(QtCore.QThread):
@@ -204,7 +181,7 @@ class StressTestCustom(QtCore.QThread):
     method, allowing it to be interruptible at certain places
     through lines like::
 
-        if self.gui.interrupted:
+        if self.gui.interrupt_requested:
             return
 
     Window to use: **paint, editor, etc.**
@@ -217,7 +194,7 @@ class StressTestCustom(QtCore.QThread):
         Construct the stress test.
 
         :param gui: the GUI control window
-        :type gui: GUITestGenerator object
+        :type gui: test_generator.generator_api.API
         """
         QtCore.QThread.__init__(self)
         self.gui = gui
@@ -237,15 +214,15 @@ class StressTestCustom(QtCore.QThread):
             os_type = Linux
         else:
             raise ValueError("Inappropriate choice of OS for custom stress test")
-        os = os_type(self.gui.image_root, dc=self.gui.user.dc_backend)
+        os = os_type(self.gui._image_root, dc=self.gui._visual_object.dc_backend)
         # NOTE: this could be moved to the arguments but is kept here
         # to simplify the example stress test
         n = 500
         for i in range(n):
-            log.info(f"Attempt {i}\{n}")
+            log.info("Attempt %s/%s", i, n)
             os.start_menu_option()
             os.press_keys(os.ESC)
-            if self.gui.interrupted:
+            if self.gui.interrupt_requested:
                 return
         log.info("No errors")
 
@@ -267,18 +244,18 @@ def run(test, params, env):
     :type env: :py:class:`virttest.utils_env.Env`
     """
     log.info("Initiating the GUI test generator's GUI with all stress tests")
-    app = QtGui.QApplication([])
+    app = QtWidgets.QApplication([])
 
     vmnet = env.get_vmnet()
-    mt = GUITestGenerator(vmnet)
+    api = API(vmnet, context=(globals().copy(), {}))
+    mt = GUITestGenerator(api)
     mt.show()
-    mt.text_edit.setText(
-        "self.stress_test(self, 'mouse-grid', 10)\u2029"
-        "self.stress_test(self, 'mouse-hit', 100)\u2029"
-        "self.stress_test(self, 'all-keys')\u2029"
-        "self.stress_test(self, 'custom')\u2029"
+    mt._w.text_edit.setText(
+        "stress_test(self, 'mouse-grid', 10)\u2029"
+        "stress_test(self, 'mouse-hit', 100)\u2029"
+        "stress_test(self, 'all-keys')\u2029"
+        "stress_test(self, 'custom')\u2029"
     )
-    mt.stress_test = stress_test
 
     log.info("GUI test generator's GUI initiated")
     # TODO: Once this is converted from pseudotest to an actual tool,

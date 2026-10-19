@@ -384,3 +384,44 @@ the bundled ``tp_multivm`` suite as the reference for:
 The implementation lives primarily in ``virttest.cartgraph``,
 ``virttest.states``, ``virttest.vmnet``, and ``virttest.intertest_setup``.
 Their generated module documentation is available from the API Reference.
+
+
+GUI test devtool
+----------------
+
+The sample suite's generator can pause and resume a VM, capture its display,
+store and restore VM states, and run Python snippets against the selected VM.
+Prepare the VMs first, then start the local PyQt5 frontend with::
+
+    avocado env setup=develop devmode=generator vms=vm1
+
+The VM host needs GuiBot and its ``vncdotool`` backend. The local frontend
+also needs PyQt5. For a host without a desktop, install Pyro5 there and expose
+only the backend::
+
+    avocado env setup=develop devmode=generator vms=vm1 api_only=yes
+
+The API listens on ``127.0.0.1:43450`` by default. ``remote_host`` and
+``remote_port`` override that address. From the workstation, forward the port
+and start the frontend, which needs only PyQt5 and Pyro5::
+
+    ssh -N -L 43450:127.0.0.1:43450 vm-host
+    python3 tp_multivm/utils/test_generator/generator_app.py -r localhost -p 43450
+
+Use a separate VNC viewer to interact with the guest display. Captures and
+``gui.control`` are stored in the test log directory on the VM host. Set
+``screenshot_storage_path`` to choose another directory, or
+``store_permanently=yes`` to use the suite's ``data/visual`` directory. The
+auto-open checkbox downloads remote captures before opening them locally.
+
+Run executes the selected text, or the whole editor when nothing is selected.
+The execution namespace persists between runs and provides ``vm``, ``vmnet``,
+``test``, ``params``, ``env``, and ``user`` (the selected VM's visual object).
+``get_vo("linux")`` and ``get_vo("windows")`` construct the existing suite
+helpers using the same display. Stop requests cooperative cancellation; loops
+should check ``self.interrupt_requested``. Execution errors appear in the
+status bar, with tracebacks in the test log.
+
+The existing stress-test panel uses the same frontend::
+
+    avocado env setup=develop devmode=testbed vms=vm1

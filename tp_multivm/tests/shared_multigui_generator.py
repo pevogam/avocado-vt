@@ -27,11 +27,9 @@ INTERFACE
 """
 
 import logging
-import sys
 
 # custom imports
-from multi_gui_utils import GUITestGenerator
-from PyQt4 import QtGui
+from test_generator.generator_api import API, DEFAULT_PORT, expose_api
 
 log = logging.getLogger("avocado.test.log")
 
@@ -52,15 +50,15 @@ def run(test, params, env):
     :param env: environment object
     :type env: :py:class:`virttest.utils_env.Env`
     """
-    log.info("Initiating the GUI test generator's GUI")
-    app = QtGui.QApplication([])
-
     vmnet = env.get_vmnet()
-    mt = GUITestGenerator(vmnet)
-    mt.show()
+    if params.get_boolean("api_only", False):
+        expose_api(
+            vmnet,
+            remote_port=params.get_numeric("remote_port", DEFAULT_PORT),
+            remote_host=params.get("remote_host", "127.0.0.1"),
+        )
+    else:
+        from test_generator.generator_app import main
 
-    log.info("GUI test generator's GUI initiated")
-    # TODO: Once this is converted from pseudotest to an actual tool,
-    # we will be free to do this
-    # sys.exit(app.exec_())
-    app.exec_()
+        log.info("Starting GUI test generator")
+        main(API(vmnet))
