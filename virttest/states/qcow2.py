@@ -370,7 +370,12 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
 
         All arguments match the base class.
         """
-        super(QCOW2Backend, cls).unset(params, object)
+        # Removing the pointer image leaves no image from which to boot.
+        cls.switch_off(params["unset_switch"], object)
+        unset_params = params.copy()
+        if unset_params["unset_switch"] != "none":
+            unset_params["unset_switch"] = "off"
+        super(QCOW2Backend, cls).unset(unset_params, object)
 
     @classmethod
     def _unset_driver(cls, params: Params, object: Any = None) -> None:
@@ -448,7 +453,8 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
         vm_dir = os.path.join(state_dir, vm_id)
         image_dir = os.path.join(vm_dir, image_name)
         logging.info("Removing base directory for image %s", image_name)
-        os.rmdir(image_dir)
+        cls.switch_off(params.get("show_switch", "hard"), object)
+        shutil.rmtree(image_dir)
 
 
 class QCOW2VTBackend(QCOW2Backend, VMStateBackend):
@@ -552,6 +558,25 @@ class QCOW2VTBackend(QCOW2Backend, VMStateBackend):
         we can simply reuse the public vm state backend unset method.
         """
         pass
+
+    @classmethod
+    def unset(cls, params: Params, object: Any = None) -> None:
+        """Delete a live VM snapshot without losing the current guest RAM."""
+        vm = object
+        if vm is None or not vm.is_alive():
+            super(RootSourcedStateBackend, cls).unset(params, object=object)
+            return
+
+        paused = vm.is_paused()
+        if not paused:
+            vm.pause()
+        try:
+            vm.verify_status("paused")
+            vm.monitor.send_args_cmd("delvm id=%s" % params["unset_state"])
+            vm.verify_status("paused")
+        finally:
+            if not paused:
+                vm.resume(timeout=3)
 
     @classmethod
     def _check(cls, params: Params, object: Any = None) -> bool:

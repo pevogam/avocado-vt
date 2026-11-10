@@ -289,6 +289,16 @@ include ``get_state``, ``set_state``, and ``unset_state``, together with
 object-specific forms such as ``get_state_images`` and
 ``set_state_vms_vm1``.
 
+Image operations finish for every image of a VM before that VM is restarted.
+If an image operation fails, the VM remains off. Deleting external image or
+RAM-file snapshots also leaves the VM off because the current image pointer
+is removed. Overwriting an internal QCOW2 VM snapshot preserves the current
+guest RAM.
+
+The ``create``, ``collect``, and ``clean`` tools manage the selected VM's
+storage preconditions, including its images. ``clean`` removes the VM's local
+stored snapshots as well as their directories.
+
 
 Selecting tests and objects
 ===========================

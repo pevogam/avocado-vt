@@ -28,11 +28,47 @@ INTERFACE
 """
 
 import logging as log
-from typing import Any
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import Any, Generator
 
 from virttest.utils_params import Params
 
 logging = log.getLogger("avocado.job." + __name__)
+
+_deferred_switches = ContextVar("state_image_switches", default=None)
+
+
+def finish_image_switches() -> None:
+    """Boot guests after all of their image operations have completed."""
+    pending = _deferred_switches.get()
+    if not pending:
+        return
+    switches = list(pending.values())
+    pending.clear()
+    token = _deferred_switches.set(None)
+    try:
+        for backend, mode, vm in switches:
+            backend.switch_on(mode, vm)
+    finally:
+        _deferred_switches.reset(token)
+
+
+@contextmanager
+def defer_image_switches() -> Generator[None, None, None]:
+    """Defer guest startup, leaving guests off if an image operation fails.
+
+    :returns: control while guest startup is deferred
+    """
+    if _deferred_switches.get() is not None:
+        yield
+        return
+    token = _deferred_switches.set({})
+    try:
+        yield
+        finish_image_switches()
+    finally:
+        _deferred_switches.reset(token)
 
 
 class StateBackend:
@@ -199,6 +235,14 @@ class ImageStateBackend(StateBackend):
             return
         if mode == "off":
             logging.info("Only off switch allowed for %s, not switching on", vm.name)
+            pending = _deferred_switches.get()
+            if pending is not None:
+                pending.pop(id(vm), None)
+            return
+
+        pending = _deferred_switches.get()
+        if pending is not None:
+            pending[id(vm)] = (cls, mode, vm)
             return
 
         logging.info("Starting the vm %s after image state operation", vm.name)
@@ -361,6 +405,8 @@ class VMStateBackend(StateBackend):
         vm, vm_name = object, params["vms"]
         logging.info("Removing vm state '%s' of %s", params["unset_state"], vm_name)
 
+        ImageStateBackend.switch_off(params.get("unset_switch", "hard"), vm)
+
         for image_name in params.objects("images"):
             image_params = params.object_params(image_name)
             # TODO: refine method arguments by providing at least the image name directly
@@ -383,6 +429,7 @@ class VMStateBackend(StateBackend):
         # we cannot use local image backend because root conditions here require running vm
         for image_name in params.objects("images"):
             image_params = params.object_params(image_name)
+            image_params["images"] = image_name
             if not cls.image_state_backend.check(image_params):
                 return False
         return True
@@ -399,6 +446,7 @@ class VMStateBackend(StateBackend):
 
         for image_name in params.objects("images"):
             image_params = params.object_params(image_name)
+            image_params["images"] = image_name
             cls.image_state_backend.initialize(image_params)
 
     @classmethod
@@ -411,8 +459,10 @@ class VMStateBackend(StateBackend):
         vm_name = params["vms"]
         logging.info("Finalizing preconditions for %s", vm_name)
 
+        ImageStateBackend.switch_off(params.get("show_switch", "hard"), object)
         for image_name in params.objects("images"):
             image_params = params.object_params(image_name)
+            image_params["images"] = image_name
             cls.image_state_backend.finalize(image_params)
 
 

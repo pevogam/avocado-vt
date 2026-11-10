@@ -28,6 +28,7 @@ INTERFACE
 
 import logging as log
 import os
+import shutil
 from typing import Any
 
 from virttest.utils_params import Params
@@ -196,4 +197,4 @@ class RamfileBackend(SourcedStateBackend, VMStateBackend):
         state_dir = params["swarm_pool"]
         vm_dir = os.path.join(state_dir, params["object_id"])
         logging.info("Removing base directory for vm states %s", vm_dir)
-        os.rmdir(vm_dir)
+        shutil.rmtree(vm_dir)

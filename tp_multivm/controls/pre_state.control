@@ -32,7 +32,7 @@ qcow2.QCOW2VTBackend.image_state_backend = qcow2.QCOW2Backend
 
 try:
     if ACTION == "show":
-        assert len(ss.show_states(Params(PARAMS), env=None)) > 0
+        assert len(ss.show_states(Params(PARAMS), env=None, require_all=True)) > 0
     elif ACTION == "get":
         ss.get_states(Params(PARAMS), env=None)
     elif ACTION == "set":

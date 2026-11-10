@@ -772,6 +772,9 @@ def collect(config: dict[str, Any], tag: str = "") -> None:
         tag,
         {
             "show_mode": "ra",
+            "show_state_vms": "root",
+            "show_state_images": "",
+            "show_state_nets": "",
             # this manual tool is compatible only with pool
             "pool_scope": "swarm cluster shared",
         },
@@ -791,6 +794,9 @@ def create(config: dict[str, Any], tag: str = "") -> None:
         tag,
         {
             "show_mode": "af",
+            "show_state_vms": "root",
+            "show_state_images": "",
+            "show_state_nets": "",
             # this manual tool is not compatible with pool
             "pool_scope": "own",
         },
@@ -810,6 +816,9 @@ def clean(config: dict[str, Any], tag: str = "") -> None:
         tag,
         {
             "show_mode": "fa",
+            "show_state_vms": "root",
+            "show_state_images": "",
+            "show_state_nets": "",
             # this manual tool is not compatible with pool
             "pool_scope": "own",
         },

@@ -157,7 +157,12 @@ class MockDriver(unittest.TestCase):
         mock_driver["check"].assert_called_once()
         mock_driver["get"].assert_not_called()
         mock_driver["set"].assert_not_called()
-        if action_type == 1:
+        if action_type == 1 and self.state_backends[state_type] == "qcow2vt":
+            self.mock_vms["vm1"].monitor.send_args_cmd.assert_called_once_with(
+                f"delvm id={state_name}"
+            )
+            mock_driver["unset"].assert_not_called()
+        elif action_type == 1:
             mock_driver["unset"].assert_called_once()
             call_params = mock_driver["unset"].call_args_list[0].args[0]
             if state_type == "image":
@@ -1985,8 +1990,8 @@ class StatesSetupTest(Test):
         self.backend.check.assert_called_once()
         # assert root state is always made available (forced provision if not available)
         self.backend.finalize.assert_called_once()
-        # assert actual state is still checked and not available
-        self.backend.show.assert_called_once()
+        # Removed storage must not be listed after finalization.
+        self.backend.show.assert_not_called()
         self.assertEqual(states, [])
 
         # assert root state is not detected then created to check the actual state

@@ -36,6 +36,8 @@ from avocado_vt.test import VirtTest
 from virttest.utils_env import Env
 from virttest.utils_params import Params
 
+from .composition import defer_image_switches, finish_image_switches
+
 logging = log.getLogger("avocado.job." + __name__)
 
 
@@ -122,12 +124,30 @@ def _state_check_chain(
     return state_exists
 
 
-def show_states(run_params: Params, env: Env = None) -> list[str]:
+def _state_operation_iteration(run_params: Params) -> Generator[Params, None, None]:
+    """Finish each guest's image operations before processing its VM state."""
+    previous_vm = None
+    for state_params in _parametric_object_iteration(run_params):
+        vm = (
+            (state_params.get("nets"), state_params.get("vms"))
+            if state_params["object_type"].split("/")[-1] == "images"
+            else None
+        )
+        if vm is None or (previous_vm is not None and vm != previous_vm):
+            finish_image_switches()
+        previous_vm = vm
+        yield state_params
+
+
+def show_states(
+    run_params: Params, env: Env = None, *, require_all: bool = False
+) -> list[str]:
     """
     Return a list of available states of a specific type.
 
     :param run_params: configuration parameters
     :param env: test environment or nothing if not needed
+    :param require_all: return no matches if any requested object has no match
     :returns: list of detected states
     """
     states = []  # TODO: return a tree structure (flatter for older backends)
@@ -151,8 +171,6 @@ def show_states(run_params: Params, env: Env = None) -> list[str]:
                 f"Skip showing {params_obj_type} states for {params_obj_name}"
             )
             continue
-        else:
-            state = "^" + state_params["show_state"] + "$"
         # TODO: document after experimental period or rather refactor
         state_params["show_mode"] = state_params.get("show_mode", "ra")
 
@@ -177,6 +195,8 @@ def show_states(run_params: Params, env: Env = None) -> list[str]:
             )
         elif not root_exists and "i" == action_if_doesnt_exist:
             logging.warning("No found states given no preconditions")
+            if require_all:
+                return []
             continue
         elif not root_exists and "f" == action_if_doesnt_exist:
             logging.info("Creating missing state management preconditions")
@@ -207,7 +227,11 @@ def show_states(run_params: Params, env: Env = None) -> list[str]:
                 "can be either of 'abort', 'reuse', 'force'."
                 % state_params["show_mode"]
             )
-        states += ["root"] if root_exists else []
+        if not root_exists:
+            if require_all:
+                return []
+            continue
+        params_obj_states = ["root"]
 
         logging.debug(
             "Checking %s for available %s states using %s",
@@ -216,20 +240,24 @@ def show_states(run_params: Params, env: Env = None) -> list[str]:
             state_params["states"],
         )
         state_backend = BACKENDS[state_params["states"]]
-        params_obj_states = state_backend.show(state_params, env)
+        params_obj_states += state_backend.show(state_params, env)
         logging.info(
             "Detected %s states for %s: %s",
             params_obj_type,
             params_obj_name,
             ", ".join(params_obj_states),
         )
+        params_obj_states = [
+            s for s in params_obj_states if re.fullmatch(state_params["show_state"], s)
+        ]
+        if require_all and not params_obj_states:
+            return []
         states += params_obj_states
 
-    # show only states that match the state show regex
-    states = [s for s in states if re.match(state, s)]
     return states
 
 
+@defer_image_switches()
 def get_states(run_params: Params, env: Env = None) -> None:
     """
     Retrieve a state disregarding the current changes.
@@ -239,7 +267,7 @@ def get_states(run_params: Params, env: Env = None) -> None:
         the vm is unavailable from the env, or snapshot exists in passive mode (abort)
     :raises: :py:class:`exceptions.TestError` if invalid policy was used
     """
-    for state_params in _parametric_object_iteration(run_params):
+    for state_params in _state_operation_iteration(run_params):
         params_obj_name = state_params["object_name"]
         params_obj_type = state_params["object_type"]
         if params_obj_type in state_params.objects("skip_types"):
@@ -312,6 +340,7 @@ def get_states(run_params: Params, env: Env = None) -> None:
         state_backend.get(state_params, state_object)
 
 
+@defer_image_switches()
 def set_states(run_params: Params, env: Env = None) -> None:
     """
     Store a state saving the current changes.
@@ -320,7 +349,7 @@ def set_states(run_params: Params, env: Env = None) -> None:
     :raises: :py:class:`exceptions.TestAbortError` if unexpected/missing snapshot in passive mode (abort)
     :raises: :py:class:`exceptions.TestError` if invalid policy was used
     """
-    for state_params in _parametric_object_iteration(run_params):
+    for state_params in _state_operation_iteration(run_params):
         params_obj_name = state_params["object_name"]
         params_obj_type = state_params["object_type"]
         if params_obj_type in state_params.objects("skip_types"):
@@ -382,6 +411,9 @@ def set_states(run_params: Params, env: Env = None) -> None:
                 )
             else:
                 logging.info("Removing the already existing snapshot")
+                state_params["unset_switch"] = state_params.get(
+                    "unset_switch", state_params["set_switch"]
+                )
                 state_backend.unset(state_params, state_object)
         elif state_exists:
             raise exceptions.TestError(
@@ -405,6 +437,7 @@ def set_states(run_params: Params, env: Env = None) -> None:
         state_backend.set(state_params, state_object)
 
 
+@defer_image_switches()
 def unset_states(run_params: Params, env: Env = None) -> None:
     """
     Remove a state with previous changes.
@@ -413,7 +446,7 @@ def unset_states(run_params: Params, env: Env = None) -> None:
     :raises: :py:class:`exceptions.TestAbortError` if missing snapshot in passive mode (abort)
     :raises: :py:class:`exceptions.TestError` if invalid policy was used
     """
-    for state_params in _parametric_object_iteration(run_params):
+    for state_params in _state_operation_iteration(run_params):
         params_obj_name = state_params["object_name"]
         params_obj_type = state_params["object_type"]
         if params_obj_type in state_params.objects("skip_types"):
@@ -486,13 +519,14 @@ def unset_states(run_params: Params, env: Env = None) -> None:
         state_backend.unset(state_params, state_object)
 
 
+@defer_image_switches()
 def push_states(run_params: Params, env: Env = None) -> None:
     """
     Identical to the set operation but used within the push/pop pair.
 
     :param run_params: configuration parameters
     """
-    for state_params in _parametric_object_iteration(run_params):
+    for state_params in _state_operation_iteration(run_params):
         params_obj_name = state_params["object_name"]
         params_obj_type = state_params["object_type"]
 
@@ -512,13 +546,14 @@ def push_states(run_params: Params, env: Env = None) -> None:
         set_states(state_params, env)
 
 
+@defer_image_switches()
 def pop_states(run_params: Params, env: Env = None) -> None:
     """
     Retrieve and remove a state/snapshot.
 
     :param run_params: configuration parameters
     """
-    for state_params in _parametric_object_iteration(run_params):
+    for state_params in _state_operation_iteration(run_params):
         params_obj_name = state_params["object_name"]
         params_obj_type = state_params["object_type"]
 
