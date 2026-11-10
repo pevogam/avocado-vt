@@ -62,7 +62,7 @@ from avocado_vt.plugins.runner import TestRunner
 from virttest.utils_params import Params
 
 from . import params_parser as param
-from .cartgraph import TestGraph, TestNode
+from .cartgraph import TestGraph, TestNode, TestWorker
 
 logging = log.getLogger("avocado.job." + __name__)
 
@@ -155,10 +155,14 @@ def with_cartesian_graph(fn: Callable[[Any], Any]) -> Callable[[Any], Any]:
         config["graph"] = CartesianGraph(l=loader, r=runner)
 
         with new_job(config) as job:
-            fn(config, tag=tag)
-
-            config["graph"] = None
-            return 0 if runner.all_results_ok() else 1
+            try:
+                fn(config, tag=tag)
+                return 0 if runner.all_results_ok() else 1
+            finally:
+                for session in TestWorker._session_cache.values():
+                    session.close()
+                TestWorker._session_cache.clear()
+                config["graph"] = None
 
     return wrapper
 

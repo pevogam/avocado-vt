@@ -12,6 +12,7 @@ from unittest_utils import DummyStateControl, DummyTestRun
 
 from avocado_vt.plugins.runner import TestRunner
 from virttest import intertest_setup, utils_params
+from virttest.cartgraph import TestWorker
 
 
 @contextlib.contextmanager
@@ -54,6 +55,22 @@ class IntertestSetupTest(Test):
         self.config["tests_str"] = "only leaves"
         self.config["tests_params"] = utils_params.Params()
         self.config["vms_params"] = utils_params.Params()
+
+    def test_manual_session_cleanup(self):
+        """Test manual steps release sessions on completion, failure, or interruption."""
+        for error in [None, RuntimeError("Manual setup failed"), KeyboardInterrupt()]:
+            with self.subTest(error=error):
+                session = mock.MagicMock()
+                setup_func = intertest_setup.with_cartesian_graph(mock.MagicMock(side_effect=error))
+                with mock.patch.object(TestWorker, '_session_cache', {"localhost:22": session}):
+                    if error is None:
+                        self.assertEqual(setup_func(self.config), 0)
+                    else:
+                        with self.assertRaises(type(error)):
+                            setup_func(self.config)
+                    session.close.assert_called_once_with()
+                    self.assertEqual(TestWorker._session_cache, {})
+                    self.assertIsNone(self.config["graph"])
 
     def test_update_default(self):
         """Test the general usage of the manual update-cache tool."""
