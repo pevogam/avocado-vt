@@ -90,10 +90,14 @@ echo "lxc.cgroup2.devices.allow = c 10:232 rwm" >> $containercfg
 echo "lxc.mount.entry = /dev/kvm dev/kvm none bind,create=file 0 0" >> $containercfg
 
 # mount results folder needed for all avocado runs
-echo "lxc.mount.entry = /root/avocado/job-results/ root/avocado/job-results/ none rw,bind,create=dir 0 0" >> $containercfg
+echo "lxc.mount.entry = /mnt/local/results mnt/local/results none rw,bind,create=dir 0 0" >> $containercfg
+
+# TODO: only needed for Avocado I2N
+echo "lxc.mount.entry = /mnt/local/isos mnt/local/isos none ro,bind,create=dir 0 0" >> $containercfg
+echo "lxc.mount.entry = /mnt/local/packages mnt/local/packages none ro,bind,create=dir 0 0" >> $containercfg
 
 echo "Starting container ${cid} environment around the current repo"
-echo "lxc.mount.entry = $(pwd) root/avocado-vt none rw,bind,create=dir 0 0" >> $containercfg
+echo "lxc.mount.entry = $(pwd) root/avocado-i2n-libs none rw,bind,create=dir 0 0" >> $containercfg
 lxc-start $cid
 # networking has to be established within a few seconds
 sleep 10
@@ -131,13 +135,25 @@ dnf install -y qemu-kvm qemu-img python-pillow libvirt libvirt-client
 # TODO: supposedly optional service for Avocado VT (missing bridge for pure Qemu VMs)
 systemctl start libvirtd
 
-echo "Installing current Avocado VT plugin in develop mode"
-cd avocado-vt
+echo "Installing most up-to-date Avocado VT dependency in develop mode"
+git clone --depth 1 https://github.com/avocado-framework/avocado-vt.git avocado-vt-libs
+cd avocado-vt-libs
 pip install -e .
 cd ..
 
 echo "Bootstrapping Avocado VT"
 avocado vt-bootstrap --yes-to-all
+
+# additional binary network dependencies for Avocado I2N
+dnf install -y tcpdump bridge-utils iptables dnsmasq
+# additional binary dependencies for Avocado I2N
+dnf install -y genisoimage dosfstools mtools
+pip install Pyro4
+
+echo "Installing current Avocado I2N plugin in develop mode"
+cd avocado-i2n-libs
+pip install -e .
+cd ..
 
 echo "Done installing all Avocado sources in develop mode"
 HERE
@@ -146,13 +162,27 @@ echo
 echo "Configure avocado to use the container"
 mkdir -p /etc/avocado
 cat> /etc/avocado/avocado.conf <<EOF
+[runner.output]
+# Whether to display colored output in terminals that support it
+colored = True
+# Whether to force colored output to non-tty outputs (e.g. log files)
+# Allowed values: auto, always, never
+color = always
+
+[datadir.paths]
+# You may override the specific job results directory with logs_dir
+logs_dir = /mnt/local/results
+
 [run]
 # LXC and remote spawners require manual status server address
-status_server_uri = 192.168.$depth_octet.254:8080
-status_server_listen = 192.168.$depth_octet.254:8080
+status_server_uri = 192.168.254.254:8080
+status_server_listen = 192.168.254.254:8080
 
 [spawner.lxc]
-slots = ['$cid']
+slots = ['c200', 'c201']
+
+[spawner.remote]
+slots = ['c200', 'c201']
 EOF
 
 echo
