@@ -73,6 +73,9 @@ jobs:
       - name: Minimal integration (functional) tests
         run: AVOCADO_LOG_DEBUG=yes avocado -V run --dry-run --vt-type qemu "only reboot"
       - run: echo "This job's status is ${{ job.status }}."
+      - name: Collect test results
+        uses: actions/upload-artifact@v4
+        #path: /home/runner/avocado/job-results
 
   package-build:
     name: Build Package for Python ${{ matrix.python-version }}
