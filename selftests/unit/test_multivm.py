@@ -213,7 +213,7 @@ class MultiVMControlTest(unittest.TestCase):
         return params
 
     def test_state_free_control_exposes_utilities_network_and_vm_startup(self):
-        with mock.patch("virttest.vmnet.setup_vmnet") as setup_vmnet_mock:
+        with mock.patch("virttest.states.hooks.setup_vmnet") as setup_vmnet_mock:
             params = self._execute_control(use_states=False)
 
             self.assertEqual(sys.path[1], self.utility_path)
