@@ -96,9 +96,7 @@ def get_cartesian_parser_details(cartesian_parser):
     details = ""
     details += "Tests produced by config file %s\n\n" % cartesian_parser.filename
 
-    details += "CartConf external parser\n\n"
-    details += cartesian_parser.node.dump(0, recurse=True)
-    return details
+    return details + str(cartesian_parser)
 
 
 def get_guest_name_parser(

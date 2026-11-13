@@ -59,10 +59,11 @@ from avocado.core.settings import settings
 from avocado.core.suite import TestSuite
 
 from avocado_vt.plugins.runner import TestRunner
+from virttest.cartconf import EmptyCartesianProduct
+from virttest.cartgraph import utils as param
 from virttest.utils_params import Params
 
 from .cartgraph import TestGraph, TestNode
-from .cartgraph import utils as param
 
 logging = log.getLogger("avocado.job." + __name__)
 
@@ -268,7 +269,7 @@ def update(config: dict[str, Any], tag: str = "") -> None:
                 verbose=False,
                 with_shared_root=False,
             )
-        except param.EmptyCartesianProduct as error:
+        except EmptyCartesianProduct as error:
             logging.warning(error)
             continue
         # flagging children will require connected graphs while flagging intersection can also handle disconnected ones
@@ -910,7 +911,10 @@ def _parse_and_iterate_for_objects_and_workers(
         operation,
         ", ".join(selected_vms),
         os.path.basename(r.job.logdir),
-        param.ParsedDict(config["param_dict"]).reportable_form().rstrip("\n"),
+        "\tParsed dictionary:\n\t\t"
+        + "\n".join("%s = %s" % item for item in config["param_dict"].items())
+        .rstrip("\n")
+        .replace("\n", "\n\t\t"),
     )
 
     graph = TestGraph()

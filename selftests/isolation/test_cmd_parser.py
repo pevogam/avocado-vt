@@ -5,11 +5,10 @@ import unittest
 from avocado import Test
 
 import virttest.cmd_parser as cmd
-from virttest.cartgraph import utils as param
+from virttest.cartconf import EmptyCartesianProduct
 
 
 class CmdParserTest(Test):
-
     def setUp(self):
         self.config = {}
         self.config["params"] = ["aaa=bbb"]
@@ -165,15 +164,15 @@ class CmdParserTest(Test):
 
     def test_abort_early_empty_product(self):
         self.config["params"] += ["only=install"]
-        with self.assertRaises(param.EmptyCartesianProduct):
+        with self.assertRaises(EmptyCartesianProduct):
             cmd.params_from_cmd(self.config)
 
         self.config["params"] = ["only=nonexistent_variant"]
-        with self.assertRaises(param.EmptyCartesianProduct):
+        with self.assertRaises(EmptyCartesianProduct):
             cmd.params_from_cmd(self.config)
 
         self.config["params"] = ["only=tutoria1", "only=tutorial2"]
-        with self.assertRaises(param.EmptyCartesianProduct):
+        with self.assertRaises(EmptyCartesianProduct):
             cmd.params_from_cmd(self.config)
 
 

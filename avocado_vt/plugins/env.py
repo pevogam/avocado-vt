@@ -37,7 +37,7 @@ from avocado.core.settings import settings
 
 from virttest import cmd_parser
 from virttest import intertest_setup as intertest
-from virttest.cartgraph import utils as param
+from virttest.cartconf import EmptyCartesianProduct
 from virttest.utils_params import Params
 
 
@@ -96,7 +96,7 @@ class Environment(CLICmd):
         try:
             cmd_parser.params_from_cmd(config)
             cmd_parser.configure_runtime(config, use_states=True)
-        except (ValueError, param.EmptyCartesianProduct) as error:
+        except (ValueError, EmptyCartesianProduct) as error:
             LOG_UI.error(error)
             return 1
         intertest.load_addons_tools()

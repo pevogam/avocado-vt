@@ -34,10 +34,10 @@ import sys
 
 from avocado.core.settings import settings
 
+from virttest.cartgraph import utils as param
 from virttest.utils_params import Params
 
 from .cartgraph import graph
-from .cartgraph import utils as param
 
 log = logging.getLogger("avocado.job." + __name__)
 
@@ -196,18 +196,19 @@ def params_from_cmd(
     config["available_restrictions"] = available_restrictions
 
     # control against invoking only runnable tests and empty Cartesian products
-    control_config = param.Reparsable()
-    control_config.parse_next_batch(
-        base_file="sets.cfg",
-        ovrwrt_file=param.tests_ovrwrt_file(),
-        ovrwrt_str=config["tests_str"],
-        ovrwrt_dict=config["param_dict"],
-    )
-    control_parser = control_config.get_parser()
+    control_config = param.get_parser()
+    control_config.parse_file(param.config_file("sets.cfg"))
+    control_config.parse_file(param.tests_ovrwrt_file())
+    if config["tests_str"]:
+        control_config.parse_str(config["tests_str"])
+    if config["param_dict"]:
+        control_config.parse_dict(config["param_dict"])
+    control_dicts = control_config.iter_params()
+    next(control_dicts)
     if with_nontrivial_restrictions:
         log.info(
             "%s tests with nontrivial restriction %s",
-            len(list(control_parser.get_dicts_gen())),
+            1 + sum(1 for _ in control_dicts),
             config["tests_str"],
         )
 
@@ -256,12 +257,11 @@ def full_vm_params_and_strs(
     :raises: :py:class:`ValueError` if no command line or default variant
              restriction could be found for some vm
     """
-    vms_config = param.Reparsable()
-    vms_config.parse_next_batch(
-        base_file="guest-base.cfg",
-        ovrwrt_file=param.vms_ovrwrt_file(),
-        ovrwrt_dict=param_dict,
-    )
+    vms_config = param.get_parser()
+    vms_config.parse_file(param.config_file("guest-base.cfg"))
+    vms_config.parse_file(param.vms_ovrwrt_file())
+    if param_dict:
+        vms_config.parse_dict(param_dict)
     vms_params = vms_config.get_params()
     for vm_name in param.all_objects("vms"):
         if use_vms_default[vm_name]:
@@ -284,12 +284,11 @@ def full_tests_params_and_str(
     :raises: :py:class:`ValueError` if the default primary restriction could is
              not valid (among the available ones)
     """
-    tests_config = param.Reparsable()
-    tests_config.parse_next_batch(
-        base_file="groups-base.cfg",
-        ovrwrt_file=param.tests_ovrwrt_file(),
-        ovrwrt_dict=param_dict,
-    )
+    tests_config = param.get_parser()
+    tests_config.parse_file(param.config_file("groups-base.cfg"))
+    tests_config.parse_file(param.tests_ovrwrt_file())
+    if param_dict:
+        tests_config.parse_dict(param_dict)
     tests_params = tests_config.get_params()
     if use_tests_default:
         default = tests_params.get("default_only", "all")

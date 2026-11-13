@@ -25,7 +25,6 @@ from avocado.core.output import LOG_JOB as logging
 from avocado.core.output import LOG_UI
 
 from virttest.cartgraph import TestGraph
-from virttest.cartgraph import utils as param
 from virttest.intertest_setup import update, with_cartesian_graph
 
 #: list of all available manual steps or simply semi-automation tools

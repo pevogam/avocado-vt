@@ -12,6 +12,7 @@ from unittest_utils import DummyStateControl, DummyTestRun
 
 from avocado_vt.plugins.loader import TestLoader
 from avocado_vt.plugins.runner import TestRunner
+from virttest.cartconf import EmptyCartesianProduct
 from virttest.cartgraph import (
     EdgeRegister,
     PrefixTree,
@@ -184,7 +185,6 @@ class CartesianWorkerTest(Test):
 
 
 class CartesianObjectTest(Test):
-
     def setUp(self):
         self.config = {}
         self.config["param_dict"] = {
@@ -277,19 +277,19 @@ class CartesianObjectTest(Test):
         self.assertRegex(test_object.params["name"], r"nets\.localhost\.net1")
 
         # some workers only support certain vm variants
-        with self.assertRaises(param.EmptyCartesianProduct):
+        with self.assertRaises(EmptyCartesianProduct):
             TestGraph.parse_composite_objects(
                 "net5", "nets", "", {"vm1": "only CentOS\n"}
             )
-        with self.assertRaises(param.EmptyCartesianProduct):
+        with self.assertRaises(EmptyCartesianProduct):
             TestGraph.parse_composite_objects(
                 "net5", "nets", "", {"vm1": "no Fedora\n"}
             )
-        with self.assertRaises(param.EmptyCartesianProduct):
+        with self.assertRaises(EmptyCartesianProduct):
             TestGraph.parse_composite_objects(
                 "net5", "nets", "", {"vm2": "only Win7\n"}
             )
-        with self.assertRaises(param.EmptyCartesianProduct):
+        with self.assertRaises(EmptyCartesianProduct):
             TestGraph.parse_composite_objects("net5", "nets", "", {"vm2": "no Win10\n"})
 
     def test_parse_composite_objects_net_and_cluster(self):
@@ -330,19 +330,19 @@ class CartesianObjectTest(Test):
         )
         self.assertRegex(test_object.params["name"], r"nets\.cluster2\.net6")
 
-        with self.assertRaises(param.EmptyCartesianProduct):
+        with self.assertRaises(EmptyCartesianProduct):
             TestGraph.parse_composite_objects(
                 "net9", "nets", "cluster2", {"vm1": "only Fedora\n"}
             )
-        with self.assertRaises(param.EmptyCartesianProduct):
+        with self.assertRaises(EmptyCartesianProduct):
             TestGraph.parse_composite_objects(
                 "net9", "nets", "cluster2", {"vm1": "no CentOS\n"}
             )
-        with self.assertRaises(param.EmptyCartesianProduct):
+        with self.assertRaises(EmptyCartesianProduct):
             TestGraph.parse_composite_objects(
                 "net9", "nets", "cluster2", {"vm2": "only Win10\n"}
             )
-        with self.assertRaises(param.EmptyCartesianProduct):
+        with self.assertRaises(EmptyCartesianProduct):
             TestGraph.parse_composite_objects(
                 "net9", "nets", "cluster2", {"vm2": "no Win7\n"}
             )
@@ -620,8 +620,8 @@ class CartesianObjectTest(Test):
             else:
                 self.assertNotIn("else", test_object.restrs)
 
-            test_object.recipe.parse_next_dict({"only_vm1": "qcow2"})
-            test_object.recipe.parse_next_dict({"no_vm1": "qcow1"})
+            test_object.recipe.parse_dict({"only_vm1": "qcow2"})
+            test_object.recipe.parse_dict({"no_vm1": "qcow1"})
             test_object.regenerate_params()
             self.assertNotIn("only_vm1", test_object.params)
             self.assertNotIn("only_vm2", test_object.params)
@@ -665,7 +665,7 @@ class CartesianObjectTest(Test):
             1,
         )
         # composite nodes may be incompatible from their default configuration
-        with self.assertRaises(param.EmptyCartesianProduct):
+        with self.assertRaises(EmptyCartesianProduct):
             TestGraph.parse_composite_objects("net5", "nets", "", restr_strs)
 
     def test_sanity_in_graph(self):
@@ -690,7 +690,6 @@ class CartesianObjectTest(Test):
 
 
 class CartesianNodeTest(Test):
-
     def setUp(self):
         self.config = {}
         self.config["param_dict"] = {
@@ -925,16 +924,16 @@ class CartesianNodeTest(Test):
         net = nets[0]
         self.assertIn("Win7", net.restrs["vm2"])
         self.assertIn("Win7", net.params["name"])
-        with self.assertRaises(param.EmptyCartesianProduct):
+        with self.assertRaises(EmptyCartesianProduct):
             TestGraph.parse_node_from_object(flat_net, "all..tutorial1")
-        with self.assertRaises(param.EmptyCartesianProduct):
+        with self.assertRaises(EmptyCartesianProduct):
             TestGraph.parse_node_from_object(
                 net,
                 "all..tutorial3.remote.object.control.decorator.util",
                 params=self.config["param_dict"],
             )
         net.restrs["vm2"] = "no Win10\n"
-        with self.assertRaises(param.EmptyCartesianProduct):
+        with self.assertRaises(EmptyCartesianProduct):
             TestGraph.parse_node_from_object(
                 net,
                 "all..tutorial3.remote.object.control.decorator.util",
@@ -1641,7 +1640,7 @@ class CartesianNodeTest(Test):
             "normal..tutorial1", flat_net, unique=True
         )
 
-        dict_generator = test_node.recipe.get_parser().get_dicts_gen()
+        dict_generator = test_node.recipe.iter_params()
         dict1 = dict_generator.__next__()
         # parser of test objects must contain exactly one dictionary
         self.assertRaises(StopIteration, dict_generator.__next__)
@@ -1693,8 +1692,8 @@ class CartesianNodeTest(Test):
                 self.assertNotIn("vm2", test_node.restrs)
                 self.assertNotIn("vm3", test_node.restrs)
 
-            test_node.recipe.parse_next_dict({"only_vm1": "qcow2"})
-            test_node.recipe.parse_next_dict({"no_vm1": "qcow1"})
+            test_node.recipe.parse_dict({"only_vm1": "qcow2"})
+            test_node.recipe.parse_dict({"no_vm1": "qcow1"})
             test_node.regenerate_params()
             self.assertNotIn("only_vm1", test_node.params)
             self.assertNotIn("only_vm2", test_node.params)
@@ -2836,7 +2835,6 @@ class CartesianNodeTest(Test):
 @mock.patch("avocado_vt.plugins.runner.SpawnerDispatcher", mock.MagicMock())
 @mock.patch.object(TestRunner, "run_test_task", DummyTestRun.mock_run_test_task)
 class CartesianGraphTest(Test):
-
     def setUp(self):
         self.config = {}
         self.config["param_dict"] = {
@@ -3127,7 +3125,7 @@ class CartesianGraphTest(Test):
         """Test incompatibility of parsed tests and pre-parsed available objects."""
         self.config["tests_str"] += "only tutorial1\n"
         self.config["vm_strs"] = {"vm2": "only Win10\n", "vm3": "only Ubuntu\n"}
-        with self.assertRaises(param.EmptyCartesianProduct):
+        with self.assertRaises(EmptyCartesianProduct):
             TestGraph.parse_object_nodes(
                 None,
                 self.config["tests_str"],
