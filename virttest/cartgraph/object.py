@@ -60,7 +60,7 @@ class TestObject(object):
         """Use unique ID to identify a test object."""
         return self.long_suffix + "-" + self.params["name"]
 
-    def __init__(self, suffix: str, recipe: param.Reparsable) -> None:
+    def __init__(self, suffix: str, recipe: param.Parser) -> None:
         """
         Construct a test object (vm) for any test nodes (tests).
 
@@ -130,12 +130,12 @@ class TestObject(object):
 
     def regenerate_params(self, verbose: bool = False) -> None:
         """
-        Regenerate all parameters from the current reparsable recipe.
+        Regenerate all parameters from the current parser snapshot.
 
         :param verbose: whether to show generated parameter dictionaries
         """
-        generic_params = self.recipe.get_params(
-            dict_index=self.dict_index, show_dictionaries=verbose
+        generic_params = param.get_params(
+            self.recipe, dict_index=self.dict_index, show_dictionaries=verbose
         )
         self._params_cache = self.object_typed_params(generic_params)
         keys = [
@@ -161,7 +161,7 @@ class NetObject(TestObject):
 
     component_form = property(fget=component_form)
 
-    def __init__(self, name: str, recipe: param.Reparsable) -> None:
+    def __init__(self, name: str, recipe: param.Parser) -> None:
         """
         Construct a test object (vm) for any test nodes (tests).
 
@@ -175,7 +175,7 @@ class NetObject(TestObject):
 class VMObject(TestObject):
     """A VM wrapper for a test object used in one or more test nodes."""
 
-    def __init__(self, name: str, recipe: param.Reparsable) -> None:
+    def __init__(self, name: str, recipe: param.Parser) -> None:
         """
         Construct a test object (vm) for any test nodes (tests).
 
@@ -202,7 +202,7 @@ class ImageObject(TestObject):
 
     component_form = property(fget=component_form)
 
-    def __init__(self, name: str, recipe: param.Reparsable) -> None:
+    def __init__(self, name: str, recipe: param.Parser) -> None:
         """
         Construct a test object (vm) for any test nodes (tests).
 

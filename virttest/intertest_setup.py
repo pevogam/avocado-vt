@@ -910,7 +910,10 @@ def _parse_and_iterate_for_objects_and_workers(
         operation,
         ", ".join(selected_vms),
         os.path.basename(r.job.logdir),
-        param.ParsedDict(config["param_dict"]).reportable_form().rstrip("\n"),
+        "\tParsed dictionary:\n\t\t"
+        + "\n".join("%s = %s" % item for item in config["param_dict"].items())
+        .rstrip("\n")
+        .replace("\n", "\n\t\t"),
     )
 
     graph = TestGraph()

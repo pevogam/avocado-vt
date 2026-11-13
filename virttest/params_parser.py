@@ -27,13 +27,13 @@ INTERFACE
 """
 
 import collections
-import copy
 import logging
 import os
+from typing import Generator
 
 from avocado.core.settings import settings
 
-from virttest.cartconf import IS_VARIANTER, Parser
+from virttest.cartconf import Parser
 from virttest.cartesian_config import print_dicts
 from virttest.utils_params import Params
 
@@ -136,405 +136,142 @@ def ovrwrt_file(category: str) -> str:
 ###################################################################
 
 
-class ParsedContent:
-    """Class for parsed content of a general type."""
-
-    def __init__(self, content: str) -> None:
-        """Initialize the parsed content."""
-        self.content = content
-
-    def reportable_form(self) -> str:
-        """
-        Get parsed content representation used in reports of parsing steps.
-
-        :returns: resulting report-compatible string
-        :raises: :py:class:`NotImplementedError` as this is an abstract method
-        """
-        raise NotImplementedError(
-            "Parsed content is an abstract class with no parsalbe form"
-        )
-
-    def parsable_form(self) -> str:
-        """
-        Convert parameter content into parsable string.
-
-        :returns: resulting parsable string
-        :raises: :py:class:`NotImplementedError` as this is an abstract method
-        """
-        raise NotImplementedError(
-            "Parsed content is an abstract class with no parsalbe form"
-        )
+def get_parser() -> Parser:
+    """Create a parser with the host and test suite defaults."""
+    parser = Parser()
+    parser.parse_string(
+        "hostname = %s\n"
+        % os.environ.get("PREFIX", os.environ.get("HOSTNAME", "avocado"))
+    )
+    suite_path = settings.as_dict().get("vt.common.suite_path")
+    parser.parse_string("suite_path = %s\n" % suite_path)
+    parser.parse_string(
+        "test_pre_hook = %s\n"
+        % os.path.join(suite_path, "controls", "pre_test.control")
+    )
+    return parser
 
 
-class ParsedFile(ParsedContent):
-    """Class for parsed content of file type."""
-
-    def __init__(self, content: str) -> None:
-        """Initialize the parsed content."""
-        super().__init__(content)
-        self.filename = content
-
-    def reportable_form(self) -> str:
-        """
-        Get parsed file representation used in reports of parsing steps.
-
-        Arguments are identical to the ones of the parent class.
-        """
-        return "\tParsed file:\n\t\t%s\n" % self.content
-
-    def parsable_form(self) -> str:
-        """
-        Convert parameter file name into parsable string.
-
-        :returns: resulting parsable string
-        """
-        return "include %s\n" % self.content
+def report_parser(parser: Parser) -> str:
+    """Describe the parser's recorded file, string and dictionary inputs."""
+    restriction = "Parsing parameters with the following configuration:\n"
+    labels = {"file": "file", "string": "string", "dict": "dictionary"}
+    for kind, content in parser.steps:
+        content = content.rstrip("\n").replace("\n", "\n\t\t")
+        restriction += "\tParsed %s:\n\t\t%s\n" % (labels[kind], content)
+    return restriction
 
 
-class ParsedStr(ParsedContent):
-    """Class for parsed content of string type."""
-
-    def reportable_form(self) -> str:
-        """
-        Get parsed string representation used in reports of parsing steps.
-
-        Arguments are identical to the ones of the parent class.
-        """
-        return "\tParsed string:\n\t\t%s\n" % self.content.rstrip("\n").replace(
-            "\n", "\n\t\t"
-        )
-
-    def parsable_form(self) -> str:
-        """
-        Convert parameter string into parsable string.
-
-        :returns: resulting parsable string
-
-        This is equivalent to the string since the string
-        is parsable by definition.
-        """
-        return self.content
-
-
-class ParsedDict(ParsedContent):
-    """Class for parsed content of dictionary type."""
-
-    def reportable_form(self) -> str:
-        """
-        Get parsed dictionary representation used in reports of parsing steps.
-
-        Arguments are identical to the ones of the parent class.
-        """
-        return "\tParsed dictionary:\n\t\t%s\n" % self.parsable_form().rstrip(
-            "\n"
-        ).replace("\n", "\n\t\t")
-
-    def parsable_form(self) -> str:
-        """
-        Convert parameter dictionary into parsable string.
-
-        :returns: resulting parsable string
-        """
-        param_str = ""
-        for key, value in self.content.items():
-            param_str += "%s = %s\n" % (key, value)
-        return param_str
-
-
-class Reparsable:
+def parse_batch(
+    parser: Parser,
+    base_file: str = None,
+    base_str: str | None = "",
+    base_dict: dict[str, str] = None,
+    ovrwrt_file: str = None,
+    ovrwrt_str: str | None = "",
+    ovrwrt_dict: dict[str, str] = None,
+) -> None:
     """
-    Class to represent quickly parsable Cartesian configuration.
+    Parse a batch of base file, string, and dictionary.
 
-    The class produces both parser and parameters (parser dicts) on demand.
+    Possibly also parse a batch of an overwrite file (with custom parameters
+    at the user's home location).
+
+    :param parser: parser to extend
+    :param base_file: file to be parsed first
+    :param base_str: string to be parsed first
+    :param base_dict: params to be added first
+    :param ovrwrt_file: file to be parsed last
+    :param ovrwrt_str: string to be parsed last
+    :param ovrwrt_dict: params to be added last
+
+    The priority of the setting follows the order of the arguments:
+    Dictionary with some parameters is topmost, string with some
+    parameters is next and the file with parameters is taken as a base.
+    The overwriting version is taken last, the base version first.
     """
+    if base_file:
+        parser.parse_file(os.path.join(custom_configs_dir(), base_file))
+    if base_str:
+        parser.parse_string(base_str)
+    if base_dict:
+        parser.parse_dict(base_dict)
+    if ovrwrt_file:
+        parser.parse_file(os.path.join(custom_configs_dir(), ovrwrt_file))
+    if ovrwrt_str:
+        parser.parse_string(ovrwrt_str)
+    if ovrwrt_dict:
+        parser.parse_dict(ovrwrt_dict)
 
-    #: cache for CartConf parsers of already parsed steps
-    #: nested structure: _parse_cache[step1_key] = {'parser': parser_after_step1, 'children': {step2_key: ...}}
-    _parse_cache = {}
 
-    def __init__(self) -> None:
-        """Initialize the parsable structure."""
-        self.steps = []
+def get_dicts(parser: Parser) -> Generator[dict[str, str], None, None]:
+    """
+    Yield parameters, raising EmptyCartesianProduct if no variant exists.
 
-    @classmethod
-    def _get_cached_parser_depth(cls, steps: list[ParsedContent]) -> tuple[Parser, int]:
-        """
-        Get a cached parser for a maximum number of already parsed initial steps.
+    :param parser: parser to evaluate
+    :returns: parameter dictionaries yielded for the configured variants
+    :raises EmptyCartesianProduct: if no variant exists
+    """
+    dictionaries = parser.get_dicts_gen()
+    try:
+        first = next(dictionaries)
+    except StopIteration:
+        raise EmptyCartesianProduct(report_parser(parser)) from None
+    yield first
+    yield from dictionaries
 
-        :param steps: complete list of parsing steps
-        :returns: a tuple of (cached_parser, depth) where depth is the number of steps
-                  the cached parser has already processed, or (None, 0) if no cache exists
-        """
-        if not IS_VARIANTER:
-            return None, 0
 
-        cache_ref = cls._parse_cache
-        cached_parser, depth = None, 0
+def get_params(
+    parser: Parser,
+    list_of_keys: list[str] = None,
+    dict_index: int = 0,
+    show_restriction: bool = False,
+    show_dictionaries: bool = False,
+    show_dict_fullname: bool = False,
+    show_dict_contents: bool = False,
+) -> Params:
+    """
+    Select a parameter dictionary from the current parser snapshot.
 
-        for step in steps:
-            key = step.parsable_form()
-            if key in cache_ref:
-                entry = cache_ref[key]
-                if entry["parser"] is not None:
-                    cached_parser = entry["parser"]
-                    depth += 1
-                cache_ref = entry["children"]
-            else:
-                # no further cache found
-                break
-
-        return cached_parser, depth
-
-    @classmethod
-    def _cache_parser(cls, steps: list[ParsedContent], parser: Parser) -> None:
-        """
-        Cache a parser for the given sequence of steps.
-
-        :param steps: the sequence of parsing steps up to this parser
-        :param parser: the parser to cache
-        """
-        if not IS_VARIANTER:
-            return
-
-        cache_ref = cls._parse_cache
-        for i, step in enumerate(steps):
-            key = step.parsable_form()
-            if key not in cache_ref:
-                if i < len(steps) - 1:
-                    raise RuntimeError(
-                        f"Cache should already exist for step {i} "
-                        f"when caching parser for steps: {[s.reportable_form() for s in steps]}"
-                    )
-                cache_ref[key] = {"parser": copy.copy(parser), "children": {}}
-            cache_ref = cache_ref[key]["children"]
-
-    def __repr__(self) -> str:
-        """Provide a representation of the parsable Cartesian configuration."""
-        restriction = "Parsing parameters with the following configuration:\n"
-        for step in self.steps:
-            restriction += step.reportable_form()
-        return restriction
-
-    def parse_next_file(self, pfile: str) -> None:
-        """
-        Add a file parsing step.
-
-        :param pfile: file to be parsed next
-
-        If the parsable file has a relative form (not and absolute path), it
-        will be searched in the relative test suite config directory.
-        """
-        if os.path.isabs(pfile):
-            filename = pfile
-        else:
-            filename = os.path.join(custom_configs_dir(), pfile)
-        self.steps.append(ParsedFile(filename))
-
-    def parse_next_str(self, pstring: str) -> None:
-        """
-        Add a string parsing step.
-
-        :param pstring: string to be parsed next
-        """
-        self.steps.append(ParsedStr(pstring))
-
-    def parse_next_dict(self, pdict: dict[str, str]) -> None:
-        """
-        Add a dictionary parsing step.
-
-        :param pdict: dictionary to be parsed next
-        """
-        self.steps.append(ParsedDict(pdict))
-
-    def parse_next_batch(
-        self,
-        base_file: str = None,
-        base_str: str | None = "",
-        base_dict: dict[str, str] = None,
-        ovrwrt_file: str = None,
-        ovrwrt_str: str | None = "",
-        ovrwrt_dict: dict[str, str] = None,
-    ) -> None:
-        """
-        Parse a batch of base file, string, and dictionary.
-
-        Possibly also parse a batch of an overwrite file (with custom parameters
-        at the user's home location).
-
-        :param base_file: file to be parsed first
-        :param base_str: string to be parsed first
-        :param base_dict: params to be added first
-        :param ovrwrt_file: file to be parsed last
-        :param ovrwrt_str: string to be parsed last
-        :param ovrwrt_dict: params to be added last
-
-        The priority of the setting follows the order of the arguments:
-        Dictionary with some parameters is topmost, string with some
-        parameters is next and the file with parameters is taken as a base.
-        The overwriting version is taken last, the base version first.
-        """
-        if base_file:
-            self.parse_next_file(base_file)
-        if base_str:
-            self.parse_next_str(base_str)
-        if base_dict:
-            self.parse_next_dict(base_dict)
-        if ovrwrt_file:
-            self.parse_next_file(ovrwrt_file)
-        if ovrwrt_str:
-            self.parse_next_str(ovrwrt_str)
-        if ovrwrt_dict:
-            self.parse_next_dict(ovrwrt_dict)
-
-    def get_parser(
-        self,
-        show_restriction: bool = False,
-        show_dictionaries: bool = False,
-        show_dict_fullname: bool = False,
-        show_dict_contents: bool = False,
-        show_empty_cartesian_product: bool = True,
-    ) -> Parser:
-        """
-        Get a basic parameters parser with its dictionaries.
-
-        :param show_restriction: whether to show the restriction strings
-        :param show_dictionaries: whether to show the obtained variants
-        :param show_dict_fullname: whether to show the variant fullname rather than its shortname
-        :param show_dict_contents: whether to show the obtained variant parameters
-        :param show_empty_cartesian_product: whether to check and show the resulting cartesian product
-
-        :returns: resulting parser
-        :raises: :py:class:`EmptyCartesianProduct` if no combination of the restrictions exists
-        """
-        # try to retrieve a cached parser from previous steps
-        parser, cache_depth = self._get_cached_parser_depth(self.steps)
-
-        # start with most-steps cached parser if any or create new one
-        if parser is not None:
-            parser = copy.copy(parser)
-        else:
-            # TODO: at present these values may fall out of sync with the cache
-            # if changed mid-test-job but this is rare and we need a better mechanism
-            # for providing defaults or dropping them entirely
-            parser = Parser()
-            # parse the base settings only once (if starting fresh)
-            parser.parse_string(
-                "hostname = %s\n"
-                % os.environ.get("PREFIX", os.environ.get("HOSTNAME", "avocado"))
-            )
-            suite_path = settings.as_dict().get("vt.common.suite_path")
-            parser.parse_string("suite_path = %s\n" % suite_path)
-            parser.parse_string(
-                "test_pre_hook = %s\n"
-                % os.path.join(suite_path, "controls", "pre_test.control")
-            )
-
-        # parse remaining steps
-        for i, step in enumerate(self.steps[cache_depth:], start=cache_depth):
-            if isinstance(step, ParsedFile):
-                parser.parse_file(step.filename)
-            elif isinstance(step, ParsedStr):
-                parser.parse_string(step.content)
-            elif isinstance(step, ParsedDict):
-                parser.parse_string(step.parsable_form())
-
-            # cache a parser copy after each step when supported
-            self._cache_parser(self.steps[: i + 1], parser)
-
-        # log any required information and detect empty Cartesian product
-        if show_restriction:
-            logging.debug(self)
-        if show_dictionaries or show_empty_cartesian_product:
-            options = collections.namedtuple(
-                "options", ["repr_mode", "fullname", "contents"]
-            )
-            peek_parser = self.get_parser(
-                show_dictionaries=False, show_empty_cartesian_product=False
-            )
-            # break generator into first detectable entry and rest to reuse it better
-            peek_generator = peek_parser.get_dicts()
-            if show_empty_cartesian_product:
-                try:
-                    peek_dict = peek_generator.__next__()
-                    if show_dictionaries:
-                        print_dicts(
-                            options(False, show_dict_fullname, show_dict_contents),
-                            (peek_dict,),
-                        )
-                        print_dicts(
-                            options(False, show_dict_fullname, show_dict_contents),
-                            peek_generator,
-                        )
-                except StopIteration:
-                    raise EmptyCartesianProduct(str(self)) from None
-            else:
-                print_dicts(
-                    options(False, show_dict_fullname, show_dict_contents),
-                    peek_generator,
-                )
-
-        return parser
-
-    def get_params(
-        self,
-        list_of_keys: list[str] = None,
-        dict_index: int = 0,
-        show_restriction: bool = False,
-        show_dictionaries: bool = False,
-        show_dict_fullname: bool = False,
-        show_dict_contents: bool = False,
-    ) -> Params:
-        """
-        Get a single parameter dictionary from the currently parsed configuration.
-
-        The parameter dictionary is always validated for existence (nonempty
-        Cartesian product) and uniqueness (no more than one final variant).
-
-        :param list_of_keys: list of parameters key in the final selection
-        :param int dict_index: index of the dictionary to use as parameters
-        :returns: first variant dictionary from all current parsed steps
-        :raises: :py:class:`AssertionError` if the parameter dictionary is not unique
-
-        The rest of the arguments are identical to the ones from :py:method:`get_parser`.
-        """
-        parser = self.get_parser(
-            show_restriction=show_restriction,
-            show_dictionaries=show_dictionaries,
-            show_dict_fullname=show_dict_fullname,
-            show_dict_contents=show_dict_contents,
-            show_empty_cartesian_product=show_dictionaries,
+    :param parser: parser to evaluate
+    :param list_of_keys: parameter keys to retain, or all keys if omitted
+    :param dict_index: index of the dictionary to select
+    :param show_restriction: whether to log the parsing inputs
+    :param show_dictionaries: whether to print all resulting variants
+    :param show_dict_fullname: whether to print full variant names
+    :param show_dict_contents: whether to print the variant parameters
+    :returns: selected parameters
+    :raises: EmptyCartesianProduct if no variant exists
+    :raises: ValueError if the requested dictionary index does not exist
+    """
+    if show_restriction:
+        logging.debug(report_parser(parser))
+    if show_dictionaries:
+        options = collections.namedtuple(
+            "options", ["repr_mode", "fullname", "contents"]
+        )
+        dictionaries = get_dicts(parser)
+        print_dicts(
+            options(False, show_dict_fullname, show_dict_contents),
+            (next(dictionaries),),
+        )
+        print_dicts(
+            options(False, show_dict_fullname, show_dict_contents), dictionaries
         )
 
-        # Check for an empty product while retrieving the requested dictionary.
-        i = -1
-        for i, d in enumerate(parser.get_dicts()):
-            if i == dict_index:
-                default_params = d
-                break
-        else:
-            if i == -1:
-                raise EmptyCartesianProduct(str(self)) from None
-            raise ValueError(
-                f"There must be a configuration for the restriction:\n{self}"
-            )
+    for i, default_params in enumerate(get_dicts(parser)):
+        if i == dict_index:
+            break
+    else:
+        raise ValueError(
+            f"There must be a configuration for the restriction:\n{report_parser(parser)}"
+        )
 
-        if list_of_keys is None:
-            selected_params = default_params
-        else:
-            selected_params = {key: default_params[key] for key in list_of_keys}
-        return Params(selected_params)
-
-    def get_copy(self) -> "Reparsable":
-        """
-        Get a copy of the current reparsable that can safely be updated further.
-
-        :returns: a copy of self with all current parsed steps in an independent list
-
-        The rest of the arguments are identical to the ones from :py:method:`get_parser`.
-        """
-        new = Reparsable()
-        new.steps = copy.copy(self.steps)
-        return new
+    if list_of_keys is None:
+        selected_params = default_params
+    else:
+        selected_params = {key: default_params[key] for key in list_of_keys}
+    return Params(selected_params)
 
 
 ###################################################################
@@ -548,9 +285,9 @@ def all_restrictions() -> list[str]:
 
     :returns: all available (from configuration) vms
     """
-    rep = Reparsable()
-    rep.parse_next_file("groups-base.cfg")
-    return rep.get_params(list_of_keys=["main_restrictions"]).objects(
+    rep = get_parser()
+    parse_batch(rep, base_file="groups-base.cfg")
+    return get_params(rep, list_of_keys=["main_restrictions"]).objects(
         "main_restrictions"
     )
 
@@ -563,9 +300,9 @@ def all_objects(key: str = "vms", composites: list[str] = None) -> list[str]:
     :param composites: composite restriction of the returned objects
     :returns: all available (from configuration) objects of a given type
     """
-    rep = Reparsable()
-    rep.parse_next_file("guest-base.cfg")
-    params = rep.get_params()
+    rep = get_parser()
+    parse_batch(rep, base_file="guest-base.cfg")
+    params = get_params(rep)
     composites = [] if not composites else composites
     for composite in composites:
         params = params.object_params(composite)
@@ -580,11 +317,10 @@ def all_suffixes_by_restriction(restriction: str, key: str = "nets") -> list[str
     :param: key: key to describe the parametric object type
     :returns: all restricted (from configuration) object suffixes of a given type
     """
-    rep = Reparsable()
-    rep.parse_next_file(f"{key}.cfg")
-    rep.parse_next_str(restriction)
-    parser = rep.get_parser()
-    return [d["shortname"] for d in parser.get_dicts()]
+    rep = get_parser()
+    parse_batch(rep, base_file=f"{key}.cfg")
+    rep.parse_string(restriction)
+    return [d["shortname"] for d in get_dicts(rep)]
 
 
 def main_vm() -> str | None:
@@ -593,9 +329,9 @@ def main_vm() -> str | None:
 
     :returns: main available (from configuration) vm
     """
-    rep = Reparsable()
-    rep.parse_next_file("guest-base.cfg")
-    return rep.get_params(list_of_keys=["main_vm"]).get("main_vm")
+    rep = get_parser()
+    parse_batch(rep, base_file="guest-base.cfg")
+    return get_params(rep, list_of_keys=["main_vm"]).get("main_vm")
 
 
 def re_str(variant_str: str, base_str: str = "", tag: str = "") -> str:

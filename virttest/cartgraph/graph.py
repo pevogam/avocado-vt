@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import asyncio
 import collections
+import copy
 import itertools
 import logging as log
 import os
@@ -561,13 +562,12 @@ class TestGraph(object):
         :returns: a list of parsed flat test objects
         """
         params = params or {}
-        params_str = param.ParsedDict(params).parsable_form()
         if "\n" in restriction:
-            restriction = param.join_str({suffix: restriction}, category, params_str)
+            restriction = param.join_str({suffix: restriction}, category)
         else:
             restriction_word = category if not restriction else restriction
             restriction = param.join_str(
-                {suffix: "only " + restriction_word + "\n"}, category, params_str
+                {suffix: "only " + restriction_word + "\n"}, category
             )
 
         if category == "images":
@@ -576,18 +576,15 @@ class TestGraph(object):
 
         test_objects: list[TestObject] = []
         # pick a suffix and all its variants via join operation
-        config = param.Reparsable()
-        config.parse_next_batch(
-            base_file=f"{category}.cfg",
-            base_str=restriction,
-            ovrwrt_file=param.ovrwrt_file("objects"),
-        )
-        for d in config.get_parser().get_dicts():
-            variant_config = config.get_copy()
-            variant_config.parse_next_str("only " + d["name"])
+        config = param.get_parser()
+        param.parse_batch(config, base_file=f"{category}.cfg", base_dict=params)
+        config.parse_string(restriction)
+        config.parse_file(param.ovrwrt_file("objects"))
+        for d in param.get_dicts(config):
+            variant_config = copy.copy(config)
+            variant_config.parse_string("only " + d["name"])
 
             test_object = object_class(suffix, variant_config)
-            # TODO: this causes a separate re-parsing for each object
             test_object.regenerate_params()
             # TODO: consider generator as performance option also for flat and composite objects
             test_objects += [test_object]
@@ -617,17 +614,13 @@ class TestGraph(object):
         :returns: parsed test objects
         """
         params = params or {}
-        params_str = param.ParsedDict(
-            {k: v for k, v in params.items() if not k.startswith("only_")}
-        ).parsable_form()
+        params = {k: v for k, v in params.items() if not k.startswith("only_")}
         if "\n" in restriction:
-            top_restriction = param.join_str(
-                {suffix: restriction}, category, params_str
-            )
+            top_restriction = param.join_str({suffix: restriction}, category)
         else:
             restriction_word = category if not restriction else restriction
             top_restriction = param.join_str(
-                {suffix: "only " + restriction_word + "\n"}, category, params_str
+                {suffix: "only " + restriction_word + "\n"}, category
             )
 
         if component_restrs is None:
@@ -638,36 +631,36 @@ class TestGraph(object):
             raise TypeError("Multi-variant image test objects are not supported.")
         object_class = NetObject if category == "nets" else VMObject
         vm_restriction = (
-            param.join_str(component_restrs, "vms", params_str)
+            param.join_str(component_restrs, "vms")
             if category == "nets"
             else top_restriction
         )
 
         test_objects: list[TestObject] = []
         # all possible component object combinations for a given composite object
-        config = param.Reparsable()
+        config = param.get_parser()
         # TODO: an unexpected order of joining in the Cartesian config requires us to parse nets first
         # instead of the more reasonable vms followed by nets
         if category == "nets":
-            config.parse_next_batch(
-                base_file="nets.cfg", base_str=top_restriction, base_dict={}
-            )
+            param.parse_batch(config, base_file="nets.cfg", base_dict=params)
+            config.parse_string(top_restriction)
         # TODO: even the new order is not good enough for multi-vm test nodes
-        config.parse_next_batch(base_file="vms.cfg", base_str=vm_restriction)
-        config.parse_next_file(param.vms_ovrwrt_file())
-        for i, d in enumerate(config.get_parser().get_dicts()):
-            variant_config = config.get_copy()
+        param.parse_batch(config, base_file="vms.cfg", base_dict=params)
+        config.parse_string(vm_restriction)
+        config.parse_file(param.vms_ovrwrt_file())
+        for i, d in enumerate(param.get_dicts(config)):
+            variant_config = copy.copy(config)
             test_object = object_class(suffix, variant_config)
 
             if category == "vms":
-                variant_config.parse_next_str("only " + d["name"])
+                variant_config.parse_string("only " + d["name"])
             elif category == "nets":
                 # TODO: joined variants do not support follow-up restrictions to generalize this to nets,
                 # this includes stacked vm-specific restrictions or any other join-generic such
                 test_object.dict_index = i
             # TODO: the Cartesian parser does not support checkpoint dictionaries
-            # test_object.recipe = param.Reparsable()
-            # test_object.recipe.parse_next_dict(d)
+            # test_object.recipe = param.get_parser()
+            # test_object.recipe.parse_dict(d)
             test_object.regenerate_params()
             test_object.update_restrs(component_restrs)
             # apply only_vm restrictions for nets during runtime (after initial parsing)
@@ -805,8 +798,8 @@ class TestGraph(object):
             vm = test_object
             for image_name in vm.params.objects("images"):
                 image_suffix = f"{image_name}_{vm.suffix}"
-                config = param.Reparsable()
-                config.parse_next_dict(vm.params.object_params(image_name))
+                config = param.get_parser()
+                config.parse_dict(vm.params.object_params(image_name))
                 image = ImageObject(image_suffix, config)
                 test_objects.append(image)
                 vm.components.append(image)
@@ -871,7 +864,7 @@ class TestGraph(object):
         flat_object = flat_objects[0]
         flat_object.update_restrs(object_restrs)
         flat_object_vms = " ".join(list(object_restrs.keys()))
-        flat_object.recipe.parse_next_dict({"vms": flat_object_vms})
+        flat_object.recipe.parse_dict({"vms": flat_object_vms})
         flat_object.params["vms"] = flat_object_vms
         return flat_object
 
@@ -891,18 +884,17 @@ class TestGraph(object):
         if restriction != "" and "\n" not in restriction:
             restriction = param.re_str(restriction)
 
-        config = param.Reparsable()
-        config.parse_next_batch(
-            base_file="sets.cfg", base_str=restriction, base_dict=params
+        config = param.get_parser()
+        param.parse_batch(
+            config, base_file="sets.cfg", base_str=restriction, base_dict=params
         )
 
         test_nodes = []
-        for i, d in enumerate(config.get_parser().get_dicts()):
-            variant_config = config.get_copy()
-            variant_config.parse_next_str("only " + d["name"])
+        for i, d in enumerate(param.get_dicts(config)):
+            variant_config = copy.copy(config)
+            variant_config.parse_string("only " + d["name"])
 
             test_node = TestNode(str(i + 1), variant_config)
-            # TODO: this causes a separate re-parsing for each node
             test_node.regenerate_params()
             # TODO: consider generator as performance option also for flat and composite nodes
             test_nodes += [test_node]
@@ -944,8 +936,9 @@ class TestGraph(object):
 
         setup_dict = params.copy() if params else {}
         setup_dict.update({"nets": test_object.suffix})
-        recipe = test_object.recipe.get_copy()
-        recipe.parse_next_batch(
+        recipe = copy.copy(test_object.recipe)
+        param.parse_batch(
+            recipe,
             base_file="sets.cfg",
             ovrwrt_file=param.tests_ovrwrt_file(),
             ovrwrt_str=restriction,
@@ -1524,11 +1517,10 @@ class TestGraph(object):
 
         # handle empty product of node and object variants
         if len(test_nodes) == 0:
-            recipe = param.Reparsable()
-            recipe.parse_next_str(param.join_str(object_restrs, "vms"))
-            recipe.parse_next_str(param.re_str(restriction))
-            recipe.parse_next_dict(params)
-            raise param.EmptyCartesianProduct(str(recipe))
+            raise param.EmptyCartesianProduct(
+                f"No test nodes for restriction {restriction!r}, "
+                f"object restrictions {object_restrs} and parameters {params}"
+            )
         if verbose:
             print("%s selected test variant(s)" % len(test_nodes))
             print(
@@ -1564,7 +1556,7 @@ class TestGraph(object):
                 clone_name = (
                     clone_source.prefix + "d" + str(i) if i > 0 else clone_source.prefix
                 )
-                clone_config = clone_source.recipe.get_copy()
+                clone_config = copy.copy(clone_source.recipe)
                 child = TestNode(clone_name, clone_config)
                 child.set_objects_from_net(clone_source.objects[0])
                 child.regenerate_params()

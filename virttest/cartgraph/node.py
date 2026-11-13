@@ -376,7 +376,7 @@ class TestNode(Runnable):
         """Use a unique test ID to identify a test node."""
         return TestID(self.prefix, self.params["name"])
 
-    def __init__(self, prefix: str, recipe: param.Reparsable) -> None:
+    def __init__(self, prefix: str, recipe: param.Parser) -> None:
         """
         Construct a test node (test) for any test objects (vms).
 
@@ -433,9 +433,9 @@ class TestNode(Runnable):
             for image_name in self.params.object_params(vm_name).objects("images"):
                 if image_name not in parsed_images:
                     image_suffix = f"{image_name}_{vm_name}"
-                    config = param.Reparsable()
-                    config.parse_next_dict(test_object.params.object_params(image_name))
-                    config.parse_next_dict(
+                    config = param.get_parser()
+                    config.parse_dict(test_object.params.object_params(image_name))
+                    config.parse_dict(
                         {"object_suffix": image_suffix, "object_type": "images"}
                     )
                     image = ImageObject(image_suffix, config)
@@ -1186,11 +1186,11 @@ class TestNode(Runnable):
 
     def regenerate_params(self, verbose: bool = False) -> None:
         """
-        Regenerate all parameters from the current reparsable config.
+        Regenerate all parameters from the current parser snapshot.
 
         :param bool verbose: whether to show generated parameter dictionaries
         """
-        self._params_cache = self.recipe.get_params(show_dictionaries=verbose)
+        self._params_cache = param.get_params(self.recipe, show_dictionaries=verbose)
         keys = [
             k
             for k in self._params_cache

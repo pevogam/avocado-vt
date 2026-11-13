@@ -566,7 +566,7 @@ class CartesianObjectTest(Test):
             unique=True,
         )
         regenerated_params = test_object.object_typed_params(
-            test_object.recipe.get_params()
+            param.get_params(test_object.recipe)
         )
         self.assertEqual(
             len(regenerated_params.keys()),
@@ -621,8 +621,8 @@ class CartesianObjectTest(Test):
             else:
                 self.assertNotIn("else", test_object.restrs)
 
-            test_object.recipe.parse_next_dict({"only_vm1": "qcow2"})
-            test_object.recipe.parse_next_dict({"no_vm1": "qcow1"})
+            test_object.recipe.parse_dict({"only_vm1": "qcow2"})
+            test_object.recipe.parse_dict({"no_vm1": "qcow1"})
             test_object.regenerate_params()
             self.assertNotIn("only_vm1", test_object.params)
             self.assertNotIn("only_vm2", test_object.params)
@@ -1642,7 +1642,7 @@ class CartesianNodeTest(Test):
             "normal..tutorial1", flat_net, unique=True
         )
 
-        dict_generator = test_node.recipe.get_parser().get_dicts()
+        dict_generator = param.get_dicts(test_node.recipe)
         dict1 = dict_generator.__next__()
         # parser of test objects must contain exactly one dictionary
         self.assertRaises(StopIteration, dict_generator.__next__)
@@ -1694,8 +1694,8 @@ class CartesianNodeTest(Test):
                 self.assertNotIn("vm2", test_node.restrs)
                 self.assertNotIn("vm3", test_node.restrs)
 
-            test_node.recipe.parse_next_dict({"only_vm1": "qcow2"})
-            test_node.recipe.parse_next_dict({"no_vm1": "qcow1"})
+            test_node.recipe.parse_dict({"only_vm1": "qcow2"})
+            test_node.recipe.parse_dict({"no_vm1": "qcow1"})
             test_node.regenerate_params()
             self.assertNotIn("only_vm1", test_node.params)
             self.assertNotIn("only_vm2", test_node.params)

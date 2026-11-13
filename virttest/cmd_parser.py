@@ -196,18 +196,20 @@ def params_from_cmd(
     config["available_restrictions"] = available_restrictions
 
     # control against invoking only runnable tests and empty Cartesian products
-    control_config = param.Reparsable()
-    control_config.parse_next_batch(
+    control_config = param.get_parser()
+    param.parse_batch(
+        control_config,
         base_file="sets.cfg",
         ovrwrt_file=param.tests_ovrwrt_file(),
         ovrwrt_str=config["tests_str"],
         ovrwrt_dict=config["param_dict"],
     )
-    control_parser = control_config.get_parser()
+    control_dicts = param.get_dicts(control_config)
+    next(control_dicts)
     if with_nontrivial_restrictions:
         log.info(
             "%s tests with nontrivial restriction %s",
-            len(list(control_parser.get_dicts())),
+            1 + sum(1 for _ in control_dicts),
             config["tests_str"],
         )
 
@@ -256,13 +258,14 @@ def full_vm_params_and_strs(
     :raises: :py:class:`ValueError` if no command line or default variant
              restriction could be found for some vm
     """
-    vms_config = param.Reparsable()
-    vms_config.parse_next_batch(
+    vms_config = param.get_parser()
+    param.parse_batch(
+        vms_config,
         base_file="guest-base.cfg",
         ovrwrt_file=param.vms_ovrwrt_file(),
         ovrwrt_dict=param_dict,
     )
-    vms_params = vms_config.get_params()
+    vms_params = param.get_params(vms_config)
     for vm_name in param.all_objects("vms"):
         if use_vms_default[vm_name]:
             default = vms_params.get("default_only_%s" % vm_name)
@@ -284,13 +287,14 @@ def full_tests_params_and_str(
     :raises: :py:class:`ValueError` if the default primary restriction could is
              not valid (among the available ones)
     """
-    tests_config = param.Reparsable()
-    tests_config.parse_next_batch(
+    tests_config = param.get_parser()
+    param.parse_batch(
+        tests_config,
         base_file="groups-base.cfg",
         ovrwrt_file=param.tests_ovrwrt_file(),
         ovrwrt_dict=param_dict,
     )
-    tests_params = tests_config.get_params()
+    tests_params = param.get_params(tests_config)
     if use_tests_default:
         default = tests_params.get("default_only", "all")
         available_restrictions = param.all_restrictions()

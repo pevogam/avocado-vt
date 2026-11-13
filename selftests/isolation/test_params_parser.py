@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+import copy
+import os
+import tempfile
 import unittest
 from unittest import mock
 
@@ -7,11 +10,9 @@ from avocado import Test
 
 import virttest.params_parser as param
 from virttest.cartconf import IS_VARIANTER, Parser
-from virttest.cartesian_config import Parser as LegacyParser
 
 
 class ParamsParserTest(Test):
-
     def setUp(self):
         self.base_dict = {}
         self.base_str = "only normal\n"
@@ -56,299 +57,87 @@ class ParamsParserTest(Test):
         with self.assertRaises(ValueError):
             param.join_str({"vm_VARIANT_NOT_IN_VMS": "param1 = A\n"}, "vms")
 
-    @unittest.skipUnless(IS_VARIANTER, "Parser caching requires CartConf")
-    @mock.patch.dict(param.Reparsable._parse_cache, clear=True)
-    @mock.patch.object(Parser, "parse_string", wraps=Parser.parse_string, autospec=True)
-    @mock.patch.object(Parser, "parse_file", wraps=Parser.parse_file, autospec=True)
-    def test_get_parser_cached(self, mock_parse_file, mock_parse_string):
-        """Test that a parser is cached and retrieved correctly."""
-        self.base_dict = {"key1": "value1"}
-        config = param.Reparsable()
-        config.parse_next_batch(
-            base_file=self.base_file,
-            base_str=self.base_str,
-            base_dict=self.base_dict,
-        )
-        parser = config.get_parser(
-            show_restriction=False,
-            show_dictionaries=False,
-            show_dict_fullname=False,
-            show_dict_contents=False,
-        )
-        self.assertEqual(
-            mock_parse_file.call_count,
-            1,
-            "parse_file should be called on first invocation",
-        )
-        self.assertEqual(
-            mock_parse_string.call_count,
-            5,
-            "parse_string should be called on first invocation",
-        )
-        self.assertEqual(
-            len(config._parse_cache),
-            1,
-            "cache should have one entry which is for the file",
-        )
-        file_key = config.steps[0].parsable_form()
-        self.assertEqual(mock_parse_file.mock_calls[0].args[1], file_key.split()[1])
-        self.assertIn(file_key, config._parse_cache)
-        self.assertIsNotNone(
-            config._parse_cache[file_key]["parser"],
-            "cached parser must be stored for the file parsing step",
-        )
-        self.assertEqual(
-            len(config._parse_cache[file_key]["children"]),
-            1,
-            "subcache should have one entry which is for the string",
-        )
-        str_key = "only normal\n"
-        self.assertEqual(mock_parse_string.mock_calls[3].args[1], str_key)
-        self.assertIn(str_key, config._parse_cache[file_key]["children"])
-        self.assertIsNotNone(
-            config._parse_cache[file_key]["children"][str_key]["parser"],
-            "cached parser must be stored for the string parsing step",
-        )
-        self.assertEqual(
-            len(config._parse_cache[file_key]["children"][str_key]["children"]),
-            1,
-            "subcache should have one entry which is for the dictionary",
-        )
-        dict_key = "key1 = value1\n"
-        self.assertEqual(mock_parse_string.mock_calls[4].args[1], dict_key)
-        self.assertIn(
-            dict_key,
-            config._parse_cache[file_key]["children"][str_key]["children"],
-        )
-        self.assertIsNotNone(
-            config._parse_cache[file_key]["children"][str_key]["children"][dict_key][
-                "parser"
-            ],
-            "cached parser must be stored for the dictionary parsing step",
-        )
-        self.assertEqual(
-            len(
-                config._parse_cache[file_key]["children"][str_key]["children"][
-                    dict_key
-                ]["children"]
-            ),
-            0,
-            "no subcache available for any further steps",
-        )
+    @unittest.skipUnless(IS_VARIANTER, "AST caching requires CartConf")
+    def test_get_parser_cached(self):
+        """Separate VT parsers reuse CartConf ASTs without sharing later edits."""
+        left, right = param.get_parser(), param.get_parser()
+        for config in (left, right):
+            param.parse_batch(config, base_file=self.base_file, base_str=self.base_str)
+        self.assertIsInstance(left, Parser)
+        self.assertIs(left.ast, right.ast)
+        expected = list(param.get_dicts(right))
+        left.parse_dict({"extra": "left"})
+        self.assertTrue(all(d["extra"] == "left" for d in param.get_dicts(left)))
+        self.assertEqual(list(param.get_dicts(right)), expected)
 
-        # second call should reuse cached parser without calling parse_string or parse_file
-        parser2 = config.get_parser(
-            show_restriction=False,
-            show_dictionaries=False,
-            show_dict_fullname=False,
-            show_dict_contents=False,
-        )
-        self.assertEqual(
-            mock_parse_string.call_count,
-            5,
-            "parse_string should not be called again on second invocation",
-        )
-        self.assertEqual(
-            mock_parse_file.call_count,
-            1,
-            "parse_file should not be called again on second invocation",
-        )
-        self.assertEqual(
-            list(parser.get_dicts()),
-            list(parser2.get_dicts()),
-            "cached parser should produce the same dictionaries",
-        )
+    def test_parser_copy_isolation(self):
+        """Recipes can branch while their parent is being evaluated."""
+        parent = param.get_parser()
+        parent.parse_string("variants:\n    - a:\n    - b:\n")
+        original_steps = parent.steps
+        for expected, d in zip(("a", "b"), param.get_dicts(parent)):
+            child = copy.copy(parent)
+            child.parse_string("only " + d["name"])
+            child.parse_dict({"branch": expected})
+            self.assertEqual(param.get_params(child)["name"], expected)
+            self.assertEqual(param.get_params(child)["branch"], expected)
+        self.assertEqual(parent.steps, original_steps)
+        self.assertEqual([d["name"] for d in param.get_dicts(parent)], ["a", "b"])
+        self.assertTrue(all("branch" not in d for d in param.get_dicts(parent)))
 
-        # different Reparsable with same steps reuses the cache
-        config2 = param.Reparsable()
-        config2.parse_next_batch(
-            base_file=self.base_file,
-            base_str=self.base_str,
-            base_dict=self.base_dict,
-        )
-        # third call from a different Reparsable should also reuse cache
-        parser3 = config2.get_parser(
-            show_restriction=False,
-            show_dictionaries=False,
-            show_dict_fullname=False,
-            show_dict_contents=False,
-        )
-        # verify that parsing methods were NOT called for this second Reparsable
-        # since it has the same steps that were already cached
-        self.assertEqual(
-            mock_parse_string.call_count,
-            5,
-            "parse_string should not be called when all steps are cached",
-        )
-        self.assertEqual(
-            mock_parse_file.call_count,
-            1,
-            "parse_file should not be called when all steps are cached",
-        )
-        self.assertEqual(
-            list(parser.get_dicts()),
-            list(parser3.get_dicts()),
-            "cached parser should be reused for different Reparsable instances",
-        )
-        initial_str_calls = list(mock_parse_string.mock_calls)
-        initial_file_calls = list(mock_parse_file.mock_calls)
+    def test_parse_batch_order(self):
+        """Files, strings and dictionaries retain their overwrite priority."""
+        with tempfile.TemporaryDirectory() as directory:
+            for name, value in (("base.cfg", "1"), ("overwrite.cfg", "4")):
+                with open(os.path.join(directory, name), "w") as handle:
+                    handle.write("value += %s\n" % value)
+            config = param.get_parser()
+            config.parse_dict({"value": "0"})
+            with mock.patch.object(param, "custom_configs_dir", return_value=directory):
+                param.parse_batch(
+                    config,
+                    base_file="base.cfg",
+                    base_str="value += 2\n",
+                    base_dict={"value": "${value}3"},
+                    ovrwrt_file="overwrite.cfg",
+                    ovrwrt_str="value += 5\n",
+                    ovrwrt_dict={"value": "${value}6"},
+                )
+            self.assertEqual(param.get_params(config)["value"], "0123456")
+            report = param.report_parser(config)
+            self.assertIn(os.path.join(directory, "base.cfg"), report)
+            self.assertIn("Parsed string:", report)
+            self.assertIn("Parsed dictionary:", report)
 
-        # different Reparsable with same initial steps reuses the cache for these steps
-        config3 = param.Reparsable()
-        config3.parse_next_batch(
-            base_file=self.base_file,
-            base_str=self.base_str,
-            base_dict={"key2": "value2"},
-        )
-        # fourth call with different base_dict should reuse 2-stage cache and not 3-stage
-        parser4 = config3.get_parser(
-            show_restriction=False,
-            show_dictionaries=False,
-            show_dict_fullname=False,
-            show_dict_contents=False,
-        )
-        # verify that parsing methods were called for specific stages
-        self.assertEqual(
-            mock_parse_string.call_count,
-            6,
-            "parse_string should be called for the new dict",
-        )
-        self.assertEqual(
-            mock_parse_file.call_count,
-            1,
-            "parse_file should not be called when all steps are cached",
-        )
-        self.assertEqual(mock_parse_file.mock_calls, initial_file_calls)
-        dict_key2 = "key2 = value2\n"
-        self.assertEqual(mock_parse_string.mock_calls[5].args[1], dict_key2)
-        self.assertEqual(
-            len(config._parse_cache),
-            1,
-            "cache should have one entry which is for the file",
-        )
-        self.assertEqual(
-            len(config._parse_cache[file_key]["children"]),
-            1,
-            "subcache should have one entry which is for the string",
-        )
-        self.assertEqual(
-            len(config._parse_cache[file_key]["children"][str_key]["children"]),
-            2,
-            "subcache should now have two entries which are for the branched dictionaries",
-        )
-        self.assertEqual(
-            len(
-                config._parse_cache[file_key]["children"][str_key]["children"][
-                    dict_key
-                ]["children"]
-            ),
-            0,
-            "no subcache available for any further steps",
-        )
-        self.assertIn(
-            dict_key,
-            config._parse_cache[file_key]["children"][str_key]["children"],
-        )
-        self.assertIsNotNone(
-            config._parse_cache[file_key]["children"][str_key]["children"][dict_key2][
-                "parser"
-            ],
-            "cached parser must be stored for the dictionary parsing step",
-        )
-        self.assertEqual(
-            len(
-                config._parse_cache[file_key]["children"][str_key]["children"][
-                    dict_key2
-                ]["children"]
-            ),
-            0,
-            "no subcache available for any further steps",
-        )
-
-        self.assertGreater(len(list(parser.get_dicts())), 0)
-        dict1 = list(parser.get_dicts())[-1]
-        self.assertGreater(len(list(parser4.get_dicts())), 0)
-        dict4 = list(parser4.get_dicts())[-1]
-        self.assertIn("key1", dict1)
-        self.assertEqual(dict1["key1"], "value1")
-        self.assertNotIn("key1", dict4)
-        self.assertNotIn("key2", dict1)
-        self.assertIn("key2", dict4)
-        self.assertEqual(dict4["key2"], "value2")
-
-    @unittest.skipUnless(IS_VARIANTER, "Parser caching requires CartConf")
-    @mock.patch.dict(param.Reparsable._parse_cache, clear=True)
-    def test_cached_parser_isolation(self):
-        """Cached siblings share immutable syntax and remain independent."""
-        base = "variants:\n    - a:\n    - b:\n"
-        left = param.Reparsable()
-        left.parse_next_batch(base_str=base, base_dict={"left": "1"})
-        child = left.get_parser()
-        expected = list(child.get_dicts())
-        self.assertEqual(len(expected), 2)
-
-        right = param.Reparsable()
-        right.parse_next_batch(base_str=base, base_dict={"right": "2"})
-        sibling = right.get_parser()
-        # the sibling dictionaries are fully parametrically decoupled
-        self.assertTrue(all("left" not in d for d in sibling.get_dicts()))
-        # child dictionaries are still the same too (decoupled from sibling)
-        self.assertEqual(list(child.get_dicts()), expected)
-
-        cached = left.get_parser()
-        self.assertIs(child.ast, cached.ast)
-        child.parse_string("only a\n")
-        self.assertEqual(len(list(child.get_dicts())), 1)
-        # cached dictionaries are same despite extended child
-        self.assertEqual(list(cached.get_dicts()), expected)
-        # freshly reused cache has the same expected dictionaries
-        self.assertEqual(list(left.get_parser().get_dicts()), expected)
-
-    @mock.patch.object(param, "IS_VARIANTER", False)
-    @mock.patch.object(param, "Parser", LegacyParser)
-    @mock.patch.dict(param.Reparsable._parse_cache, clear=True)
-    def test_local_parser_without_cache(self):
-        """The local parser reparses requests without reading or writing the cache."""
-        config = param.Reparsable()
-        config.parse_next_str("variants:\n    - a:\n    - b:\n")
-        config.parse_next_dict({"value": "one"})
-        key = config.steps[0].parsable_form()
-        cached_entry = {"parser": object(), "children": {}}
-        param.Reparsable._parse_cache[key] = cached_entry
-        with mock.patch.object(param, "copy") as parser_copy:
-            first = config.get_parser(show_empty_cartesian_product=False)
-            expected = list(first.get_dicts())
-            self.assertEqual(len(expected), 2)
-            first.parse_string("only a\n")
-            self.assertEqual(len(list(first.get_dicts())), 1)
-            second = config.get_parser(show_empty_cartesian_product=False)
-            self.assertIsInstance(second, LegacyParser)
-            self.assertIsNot(first, second)
-            self.assertEqual(list(second.get_dicts()), expected)
-            parser_copy.copy.assert_not_called()
-            parser_copy.deepcopy.assert_not_called()
-        self.assertEqual(param.Reparsable._parse_cache, {key: cached_entry})
+    def test_parser_defaults(self):
+        """New parsers pick up current defaults even after the AST cache is warm."""
+        with mock.patch.dict(os.environ, {"PREFIX": "first"}):
+            first = param.get_parser()
+            first.parse_dict({"value": "same"})
+        with mock.patch.dict(os.environ, {"PREFIX": "second"}):
+            second = param.get_parser()
+            second.parse_dict({"value": "same"})
+        self.assertEqual(param.get_params(first)["hostname"], "first")
+        self.assertEqual(param.get_params(second)["hostname"], "second")
 
     def test_parser_params(self):
         """Test that parameters obtain from parser or directly are the same."""
         self.base_str += "only tutorial1\n"
-        config = param.Reparsable()
-        config.parse_next_batch(
-            base_file=self.base_file, base_str=self.base_str, base_dict=self.base_dict
+        config = param.get_parser()
+        param.parse_batch(
+            config,
+            base_file=self.base_file,
+            base_str=self.base_str,
+            base_dict=self.base_dict,
         )
-        parser = config.get_parser(
+        params = param.get_params(
+            config,
             show_restriction=False,
             show_dictionaries=False,
             show_dict_fullname=False,
             show_dict_contents=False,
         )
-        params = config.get_params(
-            show_restriction=False,
-            show_dictionaries=False,
-            show_dict_fullname=False,
-            show_dict_contents=False,
-        )
-        d = parser.get_dicts().__next__()
+        d = param.get_dicts(config).__next__()
         for key in params.keys():
             self.assertEqual(
                 params[key],
@@ -359,24 +148,22 @@ class ParamsParserTest(Test):
     def test_params_dict_index(self):
         """Test that parameters obtained via an additional dictionary index are the correct ones."""
         self.base_str = "only all..tutorial2\n"
-        config = param.Reparsable()
-        config.parse_next_batch(
-            base_file=self.base_file, base_str=self.base_str, base_dict=self.base_dict
+        config = param.get_parser()
+        param.parse_batch(
+            config,
+            base_file=self.base_file,
+            base_str=self.base_str,
+            base_dict=self.base_dict,
         )
-        parser = config.get_parser(
-            show_restriction=False,
-            show_dictionaries=False,
-            show_dict_fullname=False,
-            show_dict_contents=False,
-        )
-        params = config.get_params(
+        params = param.get_params(
+            config,
             dict_index=1,
             show_restriction=False,
             show_dictionaries=False,
             show_dict_fullname=False,
             show_dict_contents=False,
         )
-        for i, d in enumerate(parser.get_dicts()):
+        for i, d in enumerate(param.get_dicts(config)):
             if i == 1:
                 for key in params.keys():
                     self.assertEqual(
@@ -387,50 +174,50 @@ class ParamsParserTest(Test):
                     )
 
         with self.assertRaises(ValueError):
-            config.get_params(dict_index=2)
+            param.get_params(config, dict_index=2)
 
     def test_params_single_traversal(self):
         """Selecting parameters checks existence without a second traversal."""
-        config = param.Reparsable()
-        config.parse_next_str(
+        config = param.get_parser()
+        config.parse_string(
             "variants:\n    - a:\n        value = one\n"
             "    - b:\n        value = two\n"
         )
         with mock.patch.object(
-            Parser, "get_dicts", autospec=True, side_effect=Parser.get_dicts
+            Parser, "get_dicts_gen", autospec=True, side_effect=Parser.get_dicts_gen
         ) as get_dicts:
-            params = config.get_params(list_of_keys=["value"], dict_index=1)
+            params = param.get_params(config, list_of_keys=["value"], dict_index=1)
         self.assertEqual(params, {"value": "two"})
-        # The legacy parser also calls get_dicts recursively with a node argument.
-        root_calls = [call for call in get_dicts.call_args_list if len(call.args) == 1]
-        self.assertEqual(len(root_calls), 1)
+        get_dicts.assert_called_once()
 
     def test_params_empty_product(self):
         """An empty product keeps its distinct error for any dictionary index."""
-        config = param.Reparsable()
-        config.parse_next_str("variants:\n    - a:\nonly missing\n")
+        config = param.get_parser()
+        config.parse_string("variants:\n    - a:\nonly missing\n")
         for show_dictionaries in (False, True):
             for dict_index in (0, 1, -1):
                 with self.subTest(
                     show_dictionaries=show_dictionaries, dict_index=dict_index
                 ):
                     with self.assertRaises(param.EmptyCartesianProduct) as error:
-                        config.get_params(
-                            dict_index=dict_index, show_dictionaries=show_dictionaries
+                        param.get_params(
+                            config,
+                            dict_index=dict_index,
+                            show_dictionaries=show_dictionaries,
                         )
-                    self.assertIn(str(config), str(error.exception))
+                    self.assertIn(param.report_parser(config), str(error.exception))
 
     def test_params_show_dictionaries(self):
         """Printing all variants preserves the requested parameter selection."""
-        config = param.Reparsable()
-        config.parse_next_str("variants:\n    - a:\n    - b:\n")
+        config = param.get_parser()
+        config.parse_string("variants:\n    - a:\n    - b:\n")
         printed = []
         with mock.patch.object(
             param,
             "print_dicts",
             side_effect=lambda options, dicts: printed.extend(dicts),
         ):
-            params = config.get_params(dict_index=1, show_dictionaries=True)
+            params = param.get_params(config, dict_index=1, show_dictionaries=True)
         self.assertEqual([d["name"] for d in printed], ["a", "b"])
         self.assertEqual(params, printed[1])
 
