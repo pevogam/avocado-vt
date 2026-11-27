@@ -57,7 +57,7 @@ vm_type = test"""
 
         config_parser = Parser()
         config_parser.parse_string(config)
-        params = next(config_parser.get_dicts())
+        params = next(config_parser.get_dicts_gen())
 
         instance = installer.make_installer("test_install_mode_test", params)
         self.assertTrue(isinstance(instance, Installer))

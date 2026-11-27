@@ -582,7 +582,7 @@ class TestGraph(object):
             base_str=restriction,
             ovrwrt_file=param.ovrwrt_file("objects"),
         )
-        for d in config.get_parser().get_dicts():
+        for d in config.get_parser().get_dicts_gen():
             variant_config = config.get_copy()
             variant_config.parse_next_str("only " + d["name"])
 
@@ -655,7 +655,7 @@ class TestGraph(object):
         # TODO: even the new order is not good enough for multi-vm test nodes
         config.parse_next_batch(base_file="vms.cfg", base_str=vm_restriction)
         config.parse_next_file(param.vms_ovrwrt_file())
-        for i, d in enumerate(config.get_parser().get_dicts()):
+        for i, d in enumerate(config.get_parser().get_dicts_gen()):
             variant_config = config.get_copy()
             test_object = object_class(suffix, variant_config)
 
@@ -897,7 +897,7 @@ class TestGraph(object):
         )
 
         test_nodes = []
-        for i, d in enumerate(config.get_parser().get_dicts()):
+        for i, d in enumerate(config.get_parser().get_dicts_gen()):
             variant_config = config.get_copy()
             variant_config.parse_next_str("only " + d["name"])
 

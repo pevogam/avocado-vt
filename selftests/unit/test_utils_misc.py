@@ -102,7 +102,7 @@ git_repo_foo_commit = bc732ad8b2ed8be52160b893735417b43a1e91a8
 """
         config_parser = Parser()
         config_parser.parse_string(config)
-        params = next(config_parser.get_dicts())
+        params = next(config_parser.get_dicts_gen())
 
         h = build_helper.GitRepoParamHelper(params, "foo", "/tmp/foo")
         self.assertEqual(h.name, "foo")

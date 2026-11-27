@@ -152,8 +152,8 @@ class ParamsParserTest(Test):
             "parse_file should not be called again on second invocation",
         )
         self.assertEqual(
-            list(parser.get_dicts()),
-            list(parser2.get_dicts()),
+            list(parser.get_dicts_gen()),
+            list(parser2.get_dicts_gen()),
             "cached parser should produce the same dictionaries",
         )
 
@@ -184,8 +184,8 @@ class ParamsParserTest(Test):
             "parse_file should not be called when all steps are cached",
         )
         self.assertEqual(
-            list(parser.get_dicts()),
-            list(parser3.get_dicts()),
+            list(parser.get_dicts_gen()),
+            list(parser3.get_dicts_gen()),
             "cached parser should be reused for different Reparsable instances",
         )
         initial_str_calls = list(mock_parse_string.mock_calls)
@@ -263,10 +263,10 @@ class ParamsParserTest(Test):
             "no subcache available for any further steps",
         )
 
-        self.assertGreater(len(list(parser.get_dicts())), 0)
-        dict1 = list(parser.get_dicts())[-1]
-        self.assertGreater(len(list(parser4.get_dicts())), 0)
-        dict4 = list(parser4.get_dicts())[-1]
+        self.assertGreater(len(list(parser.get_dicts_gen())), 0)
+        dict1 = list(parser.get_dicts_gen())[-1]
+        self.assertGreater(len(list(parser4.get_dicts_gen())), 0)
+        dict4 = list(parser4.get_dicts_gen())[-1]
         self.assertIn("key1", dict1)
         self.assertEqual(dict1["key1"], "value1")
         self.assertNotIn("key1", dict4)
@@ -281,25 +281,25 @@ class ParamsParserTest(Test):
         left = param.Reparsable()
         left.parse_next_batch(base_str=base, base_dict={"left": "1"})
         child = left.get_parser()
-        expected = list(child.get_dicts())
+        expected = list(child.get_dicts_gen())
         self.assertEqual(len(expected), 2)
 
         right = param.Reparsable()
         right.parse_next_batch(base_str=base, base_dict={"right": "2"})
         sibling = right.get_parser()
         # the sibling dictionaries are fully parametrically decoupled
-        self.assertTrue(all("left" not in d for d in sibling.get_dicts()))
+        self.assertTrue(all("left" not in d for d in sibling.get_dicts_gen()))
         # child dictionaries are still the same too (decoupled from sibling)
-        self.assertEqual(list(child.get_dicts()), expected)
+        self.assertEqual(list(child.get_dicts_gen()), expected)
 
         cached = left.get_parser()
         self.assertIs(child.ast, cached.ast)
         child.parse_string("only a\n")
-        self.assertEqual(len(list(child.get_dicts())), 1)
+        self.assertEqual(len(list(child.get_dicts_gen())), 1)
         # cached dictionaries are same despite extended child
-        self.assertEqual(list(cached.get_dicts()), expected)
+        self.assertEqual(list(cached.get_dicts_gen()), expected)
         # freshly reused cache has the same expected dictionaries
-        self.assertEqual(list(left.get_parser().get_dicts()), expected)
+        self.assertEqual(list(left.get_parser().get_dicts_gen()), expected)
 
 
     def test_parser_params(self):
@@ -321,7 +321,7 @@ class ParamsParserTest(Test):
             show_dict_fullname=False,
             show_dict_contents=False,
         )
-        d = parser.get_dicts().__next__()
+        d = parser.get_dicts_gen().__next__()
         for key in params.keys():
             self.assertEqual(
                 params[key],
@@ -349,7 +349,7 @@ class ParamsParserTest(Test):
             show_dict_fullname=False,
             show_dict_contents=False,
         )
-        for i, d in enumerate(parser.get_dicts()):
+        for i, d in enumerate(parser.get_dicts_gen()):
             if i == 1:
                 for key in params.keys():
                     self.assertEqual(
@@ -370,7 +370,7 @@ class ParamsParserTest(Test):
             "    - b:\n        value = two\n"
         )
         with mock.patch.object(
-            Parser, "get_dicts", autospec=True, side_effect=Parser.get_dicts
+            Parser, "get_dicts_gen", autospec=True, side_effect=Parser.get_dicts_gen
         ) as get_dicts:
             params = config.get_params(list_of_keys=["value"], dict_index=1)
         self.assertEqual(params, {"value": "two"})

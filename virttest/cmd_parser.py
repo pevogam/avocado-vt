@@ -207,7 +207,7 @@ def params_from_cmd(
     if with_nontrivial_restrictions:
         log.info(
             "%s tests with nontrivial restriction %s",
-            len(list(control_parser.get_dicts())),
+            len(list(control_parser.get_dicts_gen())),
             config["tests_str"],
         )
 

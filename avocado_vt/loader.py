@@ -52,7 +52,7 @@ def guest_listing(config, guest_name_parser=None):
     LOG.info("Available guests in config:")
     if guest_name_parser is None:
         guest_name_parser = standalone_test.get_guest_name_parser(config)
-    for params in guest_name_parser.get_dicts():
+    for params in guest_name_parser.get_dicts_gen():
         base_dir = params.get("images_base_dir", data_dir.get_data_dir())
         image_name = storage.get_image_filename(params, base_dir)
         machine_type = get_opt(config, "vt.common.machine_type")
@@ -79,7 +79,7 @@ def arch_listing(config, guest_name_parser=None):
     if guest_name_parser is None:
         guest_name_parser = standalone_test.get_guest_name_parser(config)
     machine_type = get_opt(config, "vt.common.machine_type")
-    for params in guest_name_parser.get_dicts():
+    for params in guest_name_parser.get_dicts_gen():
         LOG.debug(params["name"].replace(".%s" % machine_type, ""))
     LOG.debug("")
 
@@ -192,7 +192,7 @@ if AVOCADO_LOADER_AVAILABLE:
                 return []
             # Create test_suite
             test_suite = []
-            for params in (_ for _ in cartesian_parser.get_dicts()):
+            for params in (_ for _ in cartesian_parser.get_dicts_gen()):
                 test_suite.append((VirtTest, self.convert_parameters(params)))
             if which_tests is loader.DiscoverMode.ALL and not test_suite:
                 return self._report_bad_discovery(url, "No matching tests", which_tests)

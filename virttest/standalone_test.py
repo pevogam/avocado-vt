@@ -130,7 +130,7 @@ def get_guest_name_list(options):
     global GUEST_NAME_LIST
     if GUEST_NAME_LIST is None:
         guest_name_list = []
-        for params in get_guest_name_parser(options).get_dicts():
+        for params in get_guest_name_parser(options).get_dicts_gen():
             shortname = ".".join(params["name"].split(".")[1:-1])
             guest_name_list.append(shortname)
 

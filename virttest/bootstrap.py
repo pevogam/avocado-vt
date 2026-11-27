@@ -99,7 +99,7 @@ def get_guest_os_info_list(test_name, guest_os):
         data_dir.get_backend_cfg_path(test_name, "guest-os.cfg")
     )
     cartesian_parser.only_filter(guest_os)
-    dicts = cartesian_parser.get_dicts()
+    dicts = cartesian_parser.get_dicts_gen()
 
     for params in dicts:
         image_name = params.get("image_name", "image").split("/")[-1]
@@ -521,7 +521,7 @@ def create_subtests_cfg(t_type):
             if re.match(r"type\s*=.*", line):
                 cartesian_parser = Parser()
                 cartesian_parser.parse_string(line)
-                td = next(cartesian_parser.get_dicts())
+                td = next(cartesian_parser.get_dicts_gen())
                 values = td["type"].split(" ")
                 for value in values:
                     if t_type not in non_dropin_tests:
@@ -555,7 +555,7 @@ def create_subtests_cfg(t_type):
             if re.match(r"type\s*=.*", line):
                 cartesian_parser = Parser()
                 cartesian_parser.parse_string(line)
-                td = next(cartesian_parser.get_dicts())
+                td = next(cartesian_parser.get_dicts_gen())
                 values = td["type"].split(" ")
                 for value in values:
                     if value not in non_dropin_tests:

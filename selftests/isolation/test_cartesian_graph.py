@@ -1641,7 +1641,7 @@ class CartesianNodeTest(Test):
             "normal..tutorial1", flat_net, unique=True
         )
 
-        dict_generator = test_node.recipe.get_parser().get_dicts()
+        dict_generator = test_node.recipe.get_parser().get_dicts_gen()
         dict1 = dict_generator.__next__()
         # parser of test objects must contain exactly one dictionary
         self.assertRaises(StopIteration, dict_generator.__next__)

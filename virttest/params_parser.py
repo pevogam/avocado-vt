@@ -448,7 +448,7 @@ class Reparsable:
                 show_dictionaries=False, show_empty_cartesian_product=False
             )
             # break generator into first detectable entry and rest to reuse it better
-            peek_generator = peek_parser.get_dicts()
+            peek_generator = peek_parser.get_dicts_gen()
             if show_empty_cartesian_product:
                 try:
                     peek_dict = peek_generator.__next__()
@@ -503,7 +503,7 @@ class Reparsable:
 
         # Check for an empty product while retrieving the requested dictionary.
         i = -1
-        for i, d in enumerate(parser.get_dicts()):
+        for i, d in enumerate(parser.get_dicts_gen()):
             if i == dict_index:
                 default_params = d
                 break
@@ -580,7 +580,7 @@ def all_suffixes_by_restriction(restriction: str, key: str = "nets") -> list[str
     rep.parse_next_file(f"{key}.cfg")
     rep.parse_next_str(restriction)
     parser = rep.get_parser()
-    return [d["shortname"] for d in parser.get_dicts()]
+    return [d["shortname"] for d in parser.get_dicts_gen()]
 
 
 def main_vm() -> str | None:

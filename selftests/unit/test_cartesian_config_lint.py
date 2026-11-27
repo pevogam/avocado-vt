@@ -53,7 +53,7 @@ class CartesianCfgLint(Test):
         content = "\n".join(lines)
         parser = Parser()
         parser.parse_string(content)
-        dicts = [d for d in parser.get_dicts()]
+        dicts = [d for d in parser.get_dicts_gen()]
         len_dicts = len(dicts)
         assert len_dicts == 1
         return dicts[0]

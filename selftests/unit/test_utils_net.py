@@ -417,7 +417,7 @@ class TestVmNetSubclasses(Test):
         parser = Parser()
         parser.parse_string(self.nettests_cartesian)
         self.CartesianResult = []
-        for d in parser.get_dicts():
+        for d in parser.get_dicts_gen():
             params = utils_params.Params(d)
             self.CartesianResult.append(params)
             for vm_name in params.objects("vms"):

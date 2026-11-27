@@ -80,7 +80,7 @@ class App(object):
         tag = None
         pkgs = None
         parser = Parser(config_file)
-        for d in parser.get_dicts():
+        for d in parser.get_dicts_gen():
             if tag is not None and pkgs is not None:
                 break
 
