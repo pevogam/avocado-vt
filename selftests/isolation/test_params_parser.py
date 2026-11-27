@@ -6,8 +6,7 @@ from unittest import mock
 from avocado import Test
 
 import virttest.params_parser as param
-from virttest.cartconf import IS_VARIANTER, Parser
-from virttest.cartesian_config import Parser as LegacyParser
+from virttest.cartconf import Parser
 
 
 class ParamsParserTest(Test):
@@ -56,7 +55,6 @@ class ParamsParserTest(Test):
         with self.assertRaises(ValueError):
             param.join_str({"vm_VARIANT_NOT_IN_VMS": "param1 = A\n"}, "vms")
 
-    @unittest.skipUnless(IS_VARIANTER, "Parser caching requires CartConf")
     @mock.patch.dict(param.Reparsable._parse_cache, clear=True)
     @mock.patch.object(Parser, "parse_string", wraps=Parser.parse_string, autospec=True)
     @mock.patch.object(Parser, "parse_file", wraps=Parser.parse_file, autospec=True)
@@ -276,7 +274,6 @@ class ParamsParserTest(Test):
         self.assertIn("key2", dict4)
         self.assertEqual(dict4["key2"], "value2")
 
-    @unittest.skipUnless(IS_VARIANTER, "Parser caching requires CartConf")
     @mock.patch.dict(param.Reparsable._parse_cache, clear=True)
     def test_cached_parser_isolation(self):
         """Cached siblings share immutable syntax and remain independent."""
@@ -304,30 +301,6 @@ class ParamsParserTest(Test):
         # freshly reused cache has the same expected dictionaries
         self.assertEqual(list(left.get_parser().get_dicts()), expected)
 
-    @mock.patch.object(param, "IS_VARIANTER", False)
-    @mock.patch.object(param, "Parser", LegacyParser)
-    @mock.patch.dict(param.Reparsable._parse_cache, clear=True)
-    def test_local_parser_without_cache(self):
-        """The local parser reparses requests without reading or writing the cache."""
-        config = param.Reparsable()
-        config.parse_next_str("variants:\n    - a:\n    - b:\n")
-        config.parse_next_dict({"value": "one"})
-        key = config.steps[0].parsable_form()
-        cached_entry = {"parser": object(), "children": {}}
-        param.Reparsable._parse_cache[key] = cached_entry
-        with mock.patch.object(param, "copy") as parser_copy:
-            first = config.get_parser(show_empty_cartesian_product=False)
-            expected = list(first.get_dicts())
-            self.assertEqual(len(expected), 2)
-            first.parse_string("only a\n")
-            self.assertEqual(len(list(first.get_dicts())), 1)
-            second = config.get_parser(show_empty_cartesian_product=False)
-            self.assertIsInstance(second, LegacyParser)
-            self.assertIsNot(first, second)
-            self.assertEqual(list(second.get_dicts()), expected)
-            parser_copy.copy.assert_not_called()
-            parser_copy.deepcopy.assert_not_called()
-        self.assertEqual(param.Reparsable._parse_cache, {key: cached_entry})
 
     def test_parser_params(self):
         """Test that parameters obtain from parser or directly are the same."""
@@ -401,9 +374,7 @@ class ParamsParserTest(Test):
         ) as get_dicts:
             params = config.get_params(list_of_keys=["value"], dict_index=1)
         self.assertEqual(params, {"value": "two"})
-        # The legacy parser also calls get_dicts recursively with a node argument.
-        root_calls = [call for call in get_dicts.call_args_list if len(call.args) == 1]
-        self.assertEqual(len(root_calls), 1)
+        get_dicts.assert_called_once()
 
     def test_params_empty_product(self):
         """An empty product keeps its distinct error for any dictionary index."""

@@ -33,8 +33,8 @@ import os
 
 from avocado.core.settings import settings
 
-from virttest.cartconf import IS_VARIANTER, Parser
-from virttest.cartesian_config import print_dicts
+from virttest.cartconf import Parser
+from virttest.utils_params import print_dicts
 from virttest.utils_params import Params
 
 log = logging.getLogger("avocado.job." + __name__)
@@ -265,8 +265,6 @@ class Reparsable:
         :returns: a tuple of (cached_parser, depth) where depth is the number of steps
                   the cached parser has already processed, or (None, 0) if no cache exists
         """
-        if not IS_VARIANTER:
-            return None, 0
 
         cache_ref = cls._parse_cache
         cached_parser, depth = None, 0
@@ -293,8 +291,6 @@ class Reparsable:
         :param steps: the sequence of parsing steps up to this parser
         :param parser: the parser to cache
         """
-        if not IS_VARIANTER:
-            return
 
         cache_ref = cls._parse_cache
         for i, step in enumerate(steps):

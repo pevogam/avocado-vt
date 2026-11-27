@@ -7,11 +7,8 @@ Cartesian Configuration
 .. todo:: Usage and documentation is now being migrated to the `cartconf`
     project.
 
-Avocado-VT uses ``cartconf`` as its own specialized avocado varianter
-when it can be imported as available dependency. Otherwise, it logs an
-installation suggestion and falls back to its local ``cartesian_config``
-module. The former is written in rust while the latter is its legacy
-python implementation.
+Avocado-VT requires the external ``cartconf`` parser, whose Rust implementation
+provides Cartesian configuration parsing and variant generation.
 
 Cartesian Configuration is a highly specialized way of providing lists
 of key/value pairs within combination's of various categories. The
@@ -79,7 +76,7 @@ prepending each variant onto a list. In other words, the first variant
 name parsed will appear as the left most name component. These names can
 become quite long, and since they contain keys to distinguishing between
 results, a 'short-name' key is also used.  For example, running
-``cartesian_config.py`` against the content above produces the following
+``cartconf`` against the content above produces the following
 combinations and names::
 
     dict    1:  four.one
@@ -124,7 +121,7 @@ inherit the named variant key, along with the specific variant name.  For exampl
 
    only (var2_name=one).(var1_name=two)
 
-Results in the following outcome when parsed with ``cartesian_config.py -c``::
+Results in the following outcome when parsed with ``cartconf -c``::
 
     dict    1:  (var2_name=one).(var1_name=two)
           dep = []
@@ -524,7 +521,7 @@ The parser is available as both a python module and command-line tool
 for examining the parsing results in a text-based listing. To utilize it
 on the command-line, run the module followed by the path of the
 configuration file to parse. For example,
-``common_lib/cartesian_config.py tests/libvirt/tests.cfg``.
+``cartconf tests/libvirt/tests.cfg``.
 
 The output will be just the names of the combinatorial result set items
 (see short-names, section Variants). However,
