@@ -43,7 +43,7 @@ from typing import Any, Callable
 
 from virttest.utils_params import Params
 
-from .. import params_parser as param
+from . import utils as param
 from .node import PrefixTree, PrefixTreeNode, TestNode
 from .object import ImageObject, NetObject, TestObject, VMObject
 from .worker import TestSwarm, TestWorker

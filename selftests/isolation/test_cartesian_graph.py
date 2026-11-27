@@ -12,7 +12,6 @@ from unittest_utils import DummyStateControl, DummyTestRun
 
 from avocado_vt.plugins.loader import TestLoader
 from avocado_vt.plugins.runner import TestRunner
-from virttest import params_parser as param
 from virttest.cartgraph import (
     EdgeRegister,
     PrefixTree,
@@ -21,6 +20,7 @@ from virttest.cartgraph import (
     TestSwarm,
     TestWorker,
 )
+from virttest.cartgraph import utils as param
 
 
 class CartesianWorkerTest(Test):

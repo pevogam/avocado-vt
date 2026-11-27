@@ -36,8 +36,8 @@ from avocado.core.settings import settings
 
 from virttest.utils_params import Params
 
-from . import params_parser as param
 from .cartgraph import graph
+from .cartgraph import utils as param
 
 log = logging.getLogger("avocado.job." + __name__)
 

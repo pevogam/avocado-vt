@@ -41,7 +41,7 @@ from avocado.core.test_id import TestID
 
 from virttest.utils_params import Params
 
-from .. import params_parser as param
+from . import utils as param
 from .object import ImageObject, NetObject, TestObject
 from .worker import TestSwarm, TestWorker
 
@@ -1315,7 +1315,7 @@ class TestNode(Runnable):
                 else test_object.composites[0].suffix
             )
             # TODO: is this needed?
-            from .. import params_parser as param
+            from . import utils as param
 
             if vm_name in params.get("vms", param.all_objects("vms")):
                 should_clean = True

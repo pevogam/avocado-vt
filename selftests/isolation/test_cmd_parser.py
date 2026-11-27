@@ -5,7 +5,7 @@ import unittest
 from avocado import Test
 
 import virttest.cmd_parser as cmd
-import virttest.params_parser as param
+from virttest.cartgraph import utils as param
 
 
 class CmdParserTest(Test):

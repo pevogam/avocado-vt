@@ -32,7 +32,7 @@ import logging
 
 from virttest.utils_params import Params
 
-from .. import params_parser as param
+from . import utils as param
 
 
 class TestObject(object):

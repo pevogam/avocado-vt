@@ -63,7 +63,7 @@ class EmptyCartesianProduct(Exception):
 
 
 _devel_tp_folder = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "tp_multivm")
+    os.path.join(os.path.dirname(__file__), "..", "..", "tp_multivm")
 )
 settings.register_option(
     section="vt.common",

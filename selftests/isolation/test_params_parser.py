@@ -9,7 +9,7 @@ from avocado import Test
 
 from avocado_vt.discovery import DiscoveryMixIn
 
-import virttest.params_parser as param
+from virttest.cartgraph import utils as param
 from virttest.cartconf import Parser
 
 

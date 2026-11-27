@@ -37,7 +37,7 @@ from avocado.core.settings import settings
 
 from virttest import cmd_parser
 from virttest import intertest_setup as intertest
-from virttest import params_parser as param
+from virttest.cartgraph import utils as param
 from virttest.utils_params import Params
 
 
