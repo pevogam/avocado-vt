@@ -96,7 +96,7 @@ if __name__ == "__main__":
             "six",
             "aexpect",
             "avocado-framework>=82.1",
-            "avocado-framework-plugin-varianter-cartconf>=1.0.0",
+            "avocado-framework-plugin-varianter-cartconf>=1.1.0",
         ],
         data_files=get_data_files(),
         entry_points={

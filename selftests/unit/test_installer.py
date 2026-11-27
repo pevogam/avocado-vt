@@ -56,7 +56,7 @@ vm_type = test"""
         installer.INSTALLER_REGISTRY.register("test_install_mode", Installer, "test")
 
         config_parser = Parser()
-        config_parser.parse_string(config)
+        config_parser.parse_str(config)
         params = next(config_parser.get_dicts_gen())
 
         instance = installer.make_installer("test_install_mode_test", params)

@@ -414,13 +414,13 @@ class Reparsable:
             # for providing defaults or dropping them entirely
             parser = Parser()
             # parse the base settings only once (if starting fresh)
-            parser.parse_string(
+            parser.parse_str(
                 "hostname = %s\n"
                 % os.environ.get("PREFIX", os.environ.get("HOSTNAME", "avocado"))
             )
             suite_path = settings.as_dict().get("vt.common.suite_path")
-            parser.parse_string("suite_path = %s\n" % suite_path)
-            parser.parse_string(
+            parser.parse_str("suite_path = %s\n" % suite_path)
+            parser.parse_str(
                 "test_pre_hook = %s\n"
                 % os.path.join(suite_path, "controls", "pre_test.control")
             )
@@ -430,9 +430,9 @@ class Reparsable:
             if isinstance(step, ParsedFile):
                 parser.parse_file(step.filename)
             elif isinstance(step, ParsedStr):
-                parser.parse_string(step.content)
+                parser.parse_str(step.content)
             elif isinstance(step, ParsedDict):
-                parser.parse_string(step.parsable_form())
+                parser.parse_str(step.parsable_form())
 
             # cache a parser copy after each step when supported
             self._cache_parser(self.steps[: i + 1], parser)

@@ -56,9 +56,9 @@ class ParamsParserTest(Test):
             param.join_str({"vm_VARIANT_NOT_IN_VMS": "param1 = A\n"}, "vms")
 
     @mock.patch.dict(param.Reparsable._parse_cache, clear=True)
-    @mock.patch.object(Parser, "parse_string", wraps=Parser.parse_string, autospec=True)
+    @mock.patch.object(Parser, "parse_str", wraps=Parser.parse_str, autospec=True)
     @mock.patch.object(Parser, "parse_file", wraps=Parser.parse_file, autospec=True)
-    def test_get_parser_cached(self, mock_parse_file, mock_parse_string):
+    def test_get_parser_cached(self, mock_parse_file, mock_parse_str):
         """Test that a parser is cached and retrieved correctly."""
         self.base_dict = {"key1": "value1"}
         config = param.Reparsable()
@@ -79,9 +79,9 @@ class ParamsParserTest(Test):
             "parse_file should be called on first invocation",
         )
         self.assertEqual(
-            mock_parse_string.call_count,
+            mock_parse_str.call_count,
             5,
-            "parse_string should be called on first invocation",
+            "parse_str should be called on first invocation",
         )
         self.assertEqual(
             len(config._parse_cache),
@@ -101,7 +101,7 @@ class ParamsParserTest(Test):
             "subcache should have one entry which is for the string",
         )
         str_key = "only normal\n"
-        self.assertEqual(mock_parse_string.mock_calls[3].args[1], str_key)
+        self.assertEqual(mock_parse_str.mock_calls[3].args[1], str_key)
         self.assertIn(str_key, config._parse_cache[file_key]["children"])
         self.assertIsNotNone(
             config._parse_cache[file_key]["children"][str_key]["parser"],
@@ -113,7 +113,7 @@ class ParamsParserTest(Test):
             "subcache should have one entry which is for the dictionary",
         )
         dict_key = "key1 = value1\n"
-        self.assertEqual(mock_parse_string.mock_calls[4].args[1], dict_key)
+        self.assertEqual(mock_parse_str.mock_calls[4].args[1], dict_key)
         self.assertIn(
             dict_key,
             config._parse_cache[file_key]["children"][str_key]["children"],
@@ -134,7 +134,7 @@ class ParamsParserTest(Test):
             "no subcache available for any further steps",
         )
 
-        # second call should reuse cached parser without calling parse_string or parse_file
+        # second call should reuse cached parser without calling parse_str or parse_file
         parser2 = config.get_parser(
             show_restriction=False,
             show_dictionaries=False,
@@ -142,9 +142,9 @@ class ParamsParserTest(Test):
             show_dict_contents=False,
         )
         self.assertEqual(
-            mock_parse_string.call_count,
+            mock_parse_str.call_count,
             5,
-            "parse_string should not be called again on second invocation",
+            "parse_str should not be called again on second invocation",
         )
         self.assertEqual(
             mock_parse_file.call_count,
@@ -174,9 +174,9 @@ class ParamsParserTest(Test):
         # verify that parsing methods were NOT called for this second Reparsable
         # since it has the same steps that were already cached
         self.assertEqual(
-            mock_parse_string.call_count,
+            mock_parse_str.call_count,
             5,
-            "parse_string should not be called when all steps are cached",
+            "parse_str should not be called when all steps are cached",
         )
         self.assertEqual(
             mock_parse_file.call_count,
@@ -188,7 +188,7 @@ class ParamsParserTest(Test):
             list(parser3.get_dicts_gen()),
             "cached parser should be reused for different Reparsable instances",
         )
-        initial_str_calls = list(mock_parse_string.mock_calls)
+        initial_str_calls = list(mock_parse_str.mock_calls)
         initial_file_calls = list(mock_parse_file.mock_calls)
 
         # different Reparsable with same initial steps reuses the cache for these steps
@@ -207,9 +207,9 @@ class ParamsParserTest(Test):
         )
         # verify that parsing methods were called for specific stages
         self.assertEqual(
-            mock_parse_string.call_count,
+            mock_parse_str.call_count,
             6,
-            "parse_string should be called for the new dict",
+            "parse_str should be called for the new dict",
         )
         self.assertEqual(
             mock_parse_file.call_count,
@@ -218,7 +218,7 @@ class ParamsParserTest(Test):
         )
         self.assertEqual(mock_parse_file.mock_calls, initial_file_calls)
         dict_key2 = "key2 = value2\n"
-        self.assertEqual(mock_parse_string.mock_calls[5].args[1], dict_key2)
+        self.assertEqual(mock_parse_str.mock_calls[5].args[1], dict_key2)
         self.assertEqual(
             len(config._parse_cache),
             1,
@@ -294,7 +294,7 @@ class ParamsParserTest(Test):
 
         cached = left.get_parser()
         self.assertIs(child.ast, cached.ast)
-        child.parse_string("only a\n")
+        child.parse_str("only a\n")
         self.assertEqual(len(list(child.get_dicts_gen())), 1)
         # cached dictionaries are same despite extended child
         self.assertEqual(list(cached.get_dicts_gen()), expected)

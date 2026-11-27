@@ -520,7 +520,7 @@ def create_subtests_cfg(t_type):
             line = line.strip()
             if re.match(r"type\s*=.*", line):
                 cartesian_parser = Parser()
-                cartesian_parser.parse_string(line)
+                cartesian_parser.parse_str(line)
                 td = next(cartesian_parser.get_dicts_gen())
                 values = td["type"].split(" ")
                 for value in values:
@@ -554,7 +554,7 @@ def create_subtests_cfg(t_type):
             line = line.strip()
             if re.match(r"type\s*=.*", line):
                 cartesian_parser = Parser()
-                cartesian_parser.parse_string(line)
+                cartesian_parser.parse_str(line)
                 td = next(cartesian_parser.get_dicts_gen())
                 values = td["type"].split(" ")
                 for value in values:

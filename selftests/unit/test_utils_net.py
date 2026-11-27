@@ -415,7 +415,7 @@ class TestVmNetSubclasses(Test):
         # These warnings are annoying during testing
         utils_net.VMNet.DISCARD_WARNINGS - 1
         parser = Parser()
-        parser.parse_string(self.nettests_cartesian)
+        parser.parse_str(self.nettests_cartesian)
         self.CartesianResult = []
         for d in parser.get_dicts_gen():
             params = utils_params.Params(d)
