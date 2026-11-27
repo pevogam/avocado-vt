@@ -177,7 +177,7 @@ if AVOCADO_LOADER_AVAILABLE:
                 return self._report_bad_discovery(url, details, which_tests)
             if url is not None:
                 try:
-                    cartesian_parser.only_filter(url)
+                    cartesian_parser.parse_str("only " + url)
                 # If we have a LexerError, this means
                 # the url passed is invalid in the cartesian
                 # config parser, hence it should be ignored.

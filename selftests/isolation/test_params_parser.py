@@ -1,9 +1,13 @@
 #!/usr/bin/env python
 
+import os
+import tempfile
 import unittest
 from unittest import mock
 
 from avocado import Test
+
+from avocado_vt.discovery import DiscoveryMixIn
 
 import virttest.params_parser as param
 from virttest.cartconf import Parser
@@ -390,6 +394,30 @@ class ParamsParserTest(Test):
                             dict_index=dict_index, show_dictionaries=show_dictionaries
                         )
                     self.assertIn(str(config), str(error.exception))
+
+
+    def test_save_config_preserves_input_order(self):
+        """Saved configurations retain every input and its overwrite priority."""
+        with tempfile.TemporaryDirectory() as directory:
+            base = os.path.join(directory, "base.cfg")
+            saved = os.path.join(directory, "saved.cfg")
+            with open(base, "w") as handle:
+                handle.write("value += 1\nvariants:\n    - a:\n    - b:\n")
+            parsed = Parser()
+            parsed.parse_dict({"value": "0"})
+            parsed.parse_file(base)
+            parsed.parse_str("value += 2\n")
+            parsed.parse_dict({"value": "${value}3"})
+            parsed.parse_str("only a")
+            parsed.parse_dict({"extra": "retained"})
+            discovery = DiscoveryMixIn()
+            discovery.config = {"vt.save_config": saved}
+            discovery._save_parser_cartesian_config(parsed)
+            restored = Parser(saved)
+            self.assertEqual(
+                list(restored.get_dicts_gen()), list(parsed.get_dicts_gen())
+            )
+
 
 
 if __name__ == "__main__":

@@ -34,7 +34,7 @@ class VTResolverUtils(DiscoveryMixIn):
         self._save_parser_cartesian_config(cartesian_parser)
 
         if reference != "":
-            cartesian_parser.only_filter(reference)
+            cartesian_parser.parse_str("only " + reference)
 
         runnables = [
             self._parameters_to_runnable(d) for d in cartesian_parser.get_dicts_gen()

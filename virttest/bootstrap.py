@@ -98,7 +98,7 @@ def get_guest_os_info_list(test_name, guest_os):
     cartesian_parser.parse_file(
         data_dir.get_backend_cfg_path(test_name, "guest-os.cfg")
     )
-    cartesian_parser.only_filter(guest_os)
+    cartesian_parser.parse_str("only " + guest_os)
     dicts = cartesian_parser.get_dicts_gen()
 
     for params in dicts:

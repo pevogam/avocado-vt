@@ -122,7 +122,7 @@ def get_guest_name_parser(
         if filter_option:
             opt = get_opt(options, filter_option)
             if opt:
-                cartesian_parser.only_filter(opt)
+                cartesian_parser.parse_str("only " + opt)
     return cartesian_parser
 
 

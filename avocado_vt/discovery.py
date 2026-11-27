@@ -32,11 +32,9 @@ class DiscoveryMixIn:
         if path is None:
             return
         with open(path, "w") as cartesian_config:
-            cartesian_config.write("include %s\n" % parser.filename)
-            for statement in (
-                parser.only_filters + parser.no_filters + parser.assignments
-            ):
-                cartesian_config.write("%s\n" % statement)
+            for kind, content in parser.steps:
+                statement = "include %s" % content if kind == "file" else content
+                cartesian_config.write(statement.rstrip("\n") + "\n")
 
     def convert_parameters(self, params):
         """
