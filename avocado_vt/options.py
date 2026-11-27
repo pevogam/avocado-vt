@@ -20,9 +20,9 @@ import logging
 import os
 
 from avocado.utils import path as utils_path
+from cartconf.parser import Parser
 
 from virttest import data_dir, defaults, standalone_test
-from virttest.cartconf import Parser
 from virttest.compat import get_opt, set_opt, set_opt_from_settings
 from virttest.standalone_test import (
     SUPPORTED_DISK_BUSES,

@@ -3,9 +3,9 @@
 import unittest
 
 from avocado import Test
+from cartconf.parser import EmptyCartesianProduct
 
 import virttest.cmd_parser as cmd
-from virttest.cartconf import EmptyCartesianProduct
 
 
 class CmdParserTest(Test):

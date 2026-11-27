@@ -9,8 +9,7 @@ else:
     import unittest
 
 from avocado import Test, skipIf
-
-from virttest.cartconf import Parser
+from cartconf.parser import Parser
 
 BASEDIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 RHELDIR = os.path.join(BASEDIR, "shared", "cfg", "guest-os", "Linux", "RHEL")

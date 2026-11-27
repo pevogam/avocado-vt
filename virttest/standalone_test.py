@@ -1,9 +1,9 @@
 import os
 
 from avocado.utils import path as utils_path
+from cartconf.parser import Parser
 
 from . import data_dir
-from .cartconf import Parser
 from .compat import get_opt
 
 GUEST_NAME_LIST = None

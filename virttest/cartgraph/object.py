@@ -30,9 +30,9 @@ from __future__ import annotations
 
 import logging
 
-from virttest.utils_params import Params
+from cartconf.parser import Parser
 
-from ..cartconf import Parser
+from virttest.utils_params import Params
 
 
 class TestObject(object):
@@ -134,8 +134,8 @@ class TestObject(object):
 
         :param verbose: whether to show generated parameter dictionaries
         """
-        generic_params = self.recipe.get_params(
-            dict_index=self.dict_index, verbose=verbose
+        generic_params = Params(
+            self.recipe.get_params(dict_index=self.dict_index, verbose=verbose)
         )
         self._params_cache = self.object_typed_params(generic_params)
         keys = [

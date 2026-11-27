@@ -38,10 +38,10 @@ from aexpect import remote_door as door
 from aexpect.exceptions import ShellCmdError
 from avocado.core.nrunner.runnable import Runnable
 from avocado.core.test_id import TestID
+from cartconf.parser import Parser
 
 from virttest.utils_params import Params
 
-from ..cartconf import Parser
 from . import utils as param
 from .object import ImageObject, NetObject, TestObject
 from .worker import TestSwarm, TestWorker
@@ -1191,7 +1191,7 @@ class TestNode(Runnable):
 
         :param bool verbose: whether to show generated parameter dictionaries
         """
-        self._params_cache = self.recipe.get_params(verbose=verbose)
+        self._params_cache = Params(self.recipe.get_params(verbose=verbose))
         keys = [
             k
             for k in self._params_cache

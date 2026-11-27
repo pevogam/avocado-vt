@@ -9,12 +9,12 @@ import sys
 from avocado.utils import cpu, distro, genio, linux_modules
 from avocado.utils import path as utils_path
 from avocado.utils import process
+from cartconf.parser import Parser
 
 from virttest.vt_cluster import cluster, node
 from virttest.vt_resmgr import resmgr
 
 from . import arch, asset, data_dir, defaults, utils_selinux
-from .cartconf import Parser
 from .compat import get_opt
 
 LOG = logging.getLogger("avocado.app")

@@ -21,9 +21,9 @@ import logging
 import os
 
 from avocado.core import output
+from cartconf.parser import ParserError
 
 from virttest import data_dir, standalone_test, storage
-from virttest.cartconf import ParserError
 from virttest.compat import get_opt, set_opt
 
 from .discovery import DiscoveryMixIn

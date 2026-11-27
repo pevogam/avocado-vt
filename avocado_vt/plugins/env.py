@@ -34,10 +34,10 @@ from avocado.core.output import LOG_JOB as log
 from avocado.core.output import LOG_UI
 from avocado.core.plugin_interfaces import CLICmd
 from avocado.core.settings import settings
+from cartconf.parser import EmptyCartesianProduct
 
 from virttest import cmd_parser
 from virttest import intertest_setup as intertest
-from virttest.cartconf import EmptyCartesianProduct
 from virttest.utils_params import Params
 
 

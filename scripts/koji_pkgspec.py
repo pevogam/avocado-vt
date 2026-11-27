@@ -17,7 +17,8 @@ basedir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if os.path.isdir(os.path.join(basedir, "virttest")):
     sys.path.append(basedir)
 
-from virttest.cartconf import Parser
+from cartconf.parser import Parser
+
 from virttest.staging import utils_koji
 
 

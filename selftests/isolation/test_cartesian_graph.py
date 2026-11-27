@@ -9,6 +9,7 @@ import unittest.mock as mock
 from avocado import Test, skip
 from avocado.core import exceptions
 from avocado.core.suite import TestSuite, resolutions_to_runnables
+from cartconf.parser import EmptyCartesianProduct, Parser
 
 # this package is not treated as local folder due to its ad-hoc introduction
 from unittest_utils import DummyStateControl, DummyTestRun
@@ -16,8 +17,6 @@ from unittest_utils import DummyStateControl, DummyTestRun
 from avocado_vt.discovery import DiscoveryMixIn
 from avocado_vt.plugins.loader import TestLoader
 from avocado_vt.plugins.runner import TestRunner
-from virttest import cartconf
-from virttest.cartconf import EmptyCartesianProduct, Parser
 from virttest.cartgraph import (
     EdgeRegister,
     PrefixTree,
@@ -27,6 +26,7 @@ from virttest.cartgraph import (
     TestWorker,
 )
 from virttest.cartgraph import utils as param
+from virttest.utils_params import Params
 
 
 class TestConfig(Test):
@@ -193,31 +193,6 @@ class TestConfig(Test):
 
         with self.assertRaises(ValueError):
             config.get_params(dict_index=2)
-
-    def test_params_single_traversal(self):
-        """Selecting parameters checks existence without a second traversal."""
-        config = param.get_parser()
-        config.parse_str(
-            "variants:\n    - a:\n        value = one\n"
-            "    - b:\n        value = two\n"
-        )
-        with mock.patch.object(
-            Parser, "get_dicts_gen", autospec=True, side_effect=Parser.get_dicts_gen
-        ) as get_dicts:
-            params = config.get_params(dict_index=1)
-        self.assertEqual(params["value"], "two")
-        get_dicts.assert_called_once()
-
-    def test_params_empty_product(self):
-        """An empty product keeps its distinct error for any dictionary index."""
-        config = param.get_parser()
-        config.parse_str("variants:\n    - a:\nonly missing\n")
-        for verbose in (False, True):
-            for dict_index in (0, 1, -1):
-                with self.subTest(verbose=verbose, dict_index=dict_index):
-                    with self.assertRaises(EmptyCartesianProduct) as error:
-                        config.get_params(dict_index=dict_index, verbose=verbose)
-                    self.assertIn(str(config), str(error.exception))
 
 
 class CartesianWorkerTest(Test):
@@ -761,7 +736,7 @@ class CartesianObjectTest(Test):
             unique=True,
         )
         regenerated_params = test_object.object_typed_params(
-            test_object.recipe.get_params()
+            Params(test_object.recipe.get_params())
         )
         self.assertEqual(
             len(regenerated_params.keys()),

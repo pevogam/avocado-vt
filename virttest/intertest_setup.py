@@ -57,9 +57,9 @@ from avocado.core import data_dir, job
 from avocado.core.output import LOG_UI
 from avocado.core.settings import settings
 from avocado.core.suite import TestSuite
+from cartconf.parser import EmptyCartesianProduct
 
 from avocado_vt.plugins.runner import TestRunner
-from virttest.cartconf import EmptyCartesianProduct
 from virttest.cartgraph import utils as param
 from virttest.utils_params import Params
 

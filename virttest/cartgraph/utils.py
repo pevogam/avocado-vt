@@ -20,8 +20,9 @@ import logging
 import os
 
 from avocado.core.settings import settings
+from cartconf.parser import Parser
 
-from ..cartconf import Parser
+from ..utils_params import Params
 
 settings.register_option(
     section="vt.common",
@@ -111,7 +112,7 @@ def all_restrictions() -> list[str]:
     """
     rep = get_parser()
     rep.parse_file(config_file("groups-base.cfg"))
-    return rep.get_params().objects("main_restrictions")
+    return Params(rep.get_params()).objects("main_restrictions")
 
 
 def all_objects(key: str = "vms", composites: list[str] = None) -> list[str]:
@@ -123,7 +124,7 @@ def all_objects(key: str = "vms", composites: list[str] = None) -> list[str]:
     """
     rep = get_parser()
     rep.parse_file(config_file("guest-base.cfg"))
-    params = rep.get_params()
+    params = Params(rep.get_params())
     composites = [] if not composites else composites
     for composite in composites:
         params = params.object_params(composite)

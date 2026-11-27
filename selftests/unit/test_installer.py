@@ -10,9 +10,9 @@ if os.path.isdir(os.path.join(basedir, "virttest")):
     sys.path.append(basedir)
 
 from avocado import Test
+from cartconf.parser import Parser
 
 from virttest import installer
-from virttest.cartconf import Parser
 
 
 class installer_test(Test):

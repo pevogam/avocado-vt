@@ -42,9 +42,10 @@ import re
 import time
 from typing import Any, Callable
 
+from cartconf.parser import EmptyCartesianProduct
+
 from virttest.utils_params import Params
 
-from ..cartconf import EmptyCartesianProduct
 from . import utils as param
 from .node import PrefixTree, PrefixTreeNode, TestNode
 from .object import ImageObject, NetObject, TestObject, VMObject
